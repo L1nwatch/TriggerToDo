@@ -1,23 +1,8 @@
-import pytest
-from fastapi import HTTPException
-
 from app.models import DeltaState, TodoListCache, TodoTaskCache
-from app.sync import DeltaSyncService, require_user_oid
-
-
-def test_require_user_oid_success() -> None:
-    assert require_user_oid({"user_oid": "u1"}) == "u1"
-
-
-def test_require_user_oid_missing_raises() -> None:
-    with pytest.raises(HTTPException) as exc:
-        require_user_oid({})
-    assert exc.value.status_code == 401
+from app.sync import DeltaSyncService
 
 
 def test_delta_sync_service_updates_local_cache(db_session, monkeypatch) -> None:
-    user_oid = "user-1"
-
     class FakeGraphClient:
         def __init__(self, db):
             self.db = db
@@ -40,6 +25,8 @@ def test_delta_sync_service_updates_local_cache(db_session, monkeypatch) -> None
                         "status": "notStarted",
                         "body": {"content": "Details"},
                         "importance": "normal",
+                        "createdDateTime": "2026-03-01T10:00:00Z",
+                        "lastModifiedDateTime": "2026-03-01T10:00:00Z",
                         "dueDateTime": {"dateTime": "2026-03-01T10:00:00", "timeZone": "UTC"},
                         "extensions": [
                             {
@@ -56,7 +43,7 @@ def test_delta_sync_service_updates_local_cache(db_session, monkeypatch) -> None
 
     monkeypatch.setattr("app.sync.GraphClient", FakeGraphClient)
 
-    result = DeltaSyncService(db_session).run_for_user(user_oid)
+    result = DeltaSyncService(db_session).run_for_user()
     assert result == {"listsSynced": 1, "tasksSynced": 1}
 
     lists = db_session.query(TodoListCache).all()
@@ -75,7 +62,6 @@ def test_delta_sync_service_updates_local_cache(db_session, monkeypatch) -> None
 
 
 def test_delta_sync_preserves_existing_fields_on_partial_task_payload(db_session, monkeypatch) -> None:
-    user_oid = "user-2"
     calls = {"task": 0}
 
     class FakeGraphClient:
@@ -98,14 +84,16 @@ def test_delta_sync_preserves_existing_fields_on_partial_task_payload(db_session
             if calls["task"] == 1:
                 return {
                     "value": [
-                        {
-                            "id": "task-1",
-                            "title": "Original title",
-                            "status": "notStarted",
-                            "body": {"content": "Details"},
-                            "importance": "normal",
-                            "dueDateTime": {"dateTime": "2026-03-01T10:00:00", "timeZone": "UTC"},
-                            "extensions": [
+                            {
+                                "id": "task-1",
+                                "title": "Original title",
+                                "status": "notStarted",
+                                "body": {"content": "Details"},
+                                "importance": "normal",
+                                "createdDateTime": "2026-03-01T10:00:00Z",
+                                "lastModifiedDateTime": "2026-03-01T10:00:00Z",
+                                "dueDateTime": {"dateTime": "2026-03-01T10:00:00", "timeZone": "UTC"},
+                                "extensions": [
                                 {
                                     "extensionName": "com.triggertodo.meta",
                                     "pool": "triggered",
@@ -123,6 +111,7 @@ def test_delta_sync_preserves_existing_fields_on_partial_task_payload(db_session
                         "id": "task-1",
                         "title": "Updated title",
                         "status": "notStarted",
+                        "lastModifiedDateTime": "2026-03-01T12:00:00Z",
                     }
                 ],
                 "@odata.deltaLink": "tasks-delta-token-2",
@@ -131,8 +120,8 @@ def test_delta_sync_preserves_existing_fields_on_partial_task_payload(db_session
     monkeypatch.setattr("app.sync.GraphClient", FakeGraphClient)
 
     service = DeltaSyncService(db_session)
-    service.run_for_user(user_oid)
-    service.run_for_user(user_oid)
+    service.run_for_user()
+    service.run_for_user()
 
     task = db_session.query(TodoTaskCache).one()
     assert task.title == "Updated title"

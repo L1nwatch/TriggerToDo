@@ -21,7 +21,6 @@ def test_task_payload_from_create_contains_open_extension() -> None:
 
 def test_rule_to_dict_contains_expected_fields(db_session) -> None:
     row = TriggerRule(
-        user_oid="user-1",
         name="Promote",
         source_pool="inbox",
         source_wf_status="todo",
@@ -40,10 +39,7 @@ def test_rule_to_dict_contains_expected_fields(db_session) -> None:
 
 
 def test_trigger_engine_moves_matching_tasks(db_session, monkeypatch) -> None:
-    user_oid = "user-1"
-
     rule = TriggerRule(
-        user_oid=user_oid,
         name="Move backlog",
         source_pool="backlog",
         source_wf_status="queued",
@@ -55,7 +51,6 @@ def test_trigger_engine_moves_matching_tasks(db_session, monkeypatch) -> None:
     db_session.flush()
 
     task = TodoTaskCache(
-        user_oid=user_oid,
         graph_list_id="list-1",
         graph_task_id="task-1",
         title="Task",
@@ -79,24 +74,8 @@ def test_trigger_engine_moves_matching_tasks(db_session, monkeypatch) -> None:
     db_session.add(task)
     db_session.commit()
 
-    calls = []
-
-    class FakeGraphClient:
-        def __init__(self, db):
-            self.db = db
-
-        def _request(self, user_oid_arg, method, path, **kwargs):
-            calls.append((user_oid_arg, method, path, kwargs))
-            return {}
-
-        def update_task(self, *args, **kwargs):
-            calls.append(("update_task", args, kwargs))
-            return {}
-
-    monkeypatch.setattr("app.trigger_engine.GraphClient", FakeGraphClient)
-
     engine = TriggerEngine(interval_seconds=30)
-    result = engine.run_once_for_user(db_session, user_oid)
+    result = engine.run_once_for_user(db_session)
 
     assert result == {"moved": 1}
     db_session.refresh(task)
@@ -104,10 +83,8 @@ def test_trigger_engine_moves_matching_tasks(db_session, monkeypatch) -> None:
     assert task.wf_status == "active"
     assert task.trigger_ref == str(rule.id)
 
-    assert len(calls) == 1
-    _, method, path, kwargs = calls[0]
-    assert method == "PATCH"
-    assert "/extensions/ext-123" in path
-    ext_payload = json.loads(kwargs["data"])
-    assert ext_payload["pool"] == "today"
-    assert ext_payload["wfStatus"] == "active"
+    raw = json.loads(task.raw_json)
+    ext = next(item for item in raw["extensions"] if item.get("extensionName") == "com.triggertodo.meta")
+    assert ext["pool"] == "today"
+    assert ext["wfStatus"] == "active"
+    assert ext["triggerRef"] == str(rule.id)

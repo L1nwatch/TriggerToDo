@@ -48,19 +48,18 @@ class DeltaSyncService:
         self.db = db
         self.graph = GraphClient(db)
 
-    def run_for_user(self, user_oid: str) -> dict[str, Any]:
-        self._prune_old_cached_tasks(user_oid)
-        synced_lists = self._sync_lists(user_oid)
+    def run_for_user(self, user_oid: str | None = None) -> dict[str, Any]:
+        _ = user_oid
+        self._prune_old_cached_tasks()
+        synced_lists = self._sync_lists()
         synced_tasks = 0
-
-        list_rows = self.db.query(TodoListCache).filter(TodoListCache.user_oid == user_oid).all()
+        list_rows = self.db.query(TodoListCache).all()
         for row in list_rows:
-            synced_tasks += self._sync_tasks_for_list(user_oid, row.graph_list_id)
-
+            synced_tasks += self._sync_tasks_for_list(row.graph_list_id)
         return {"listsSynced": synced_lists, "tasksSynced": synced_tasks}
 
-    def _prune_old_cached_tasks(self, user_oid: str) -> None:
-        rows = self.db.query(TodoTaskCache).filter(TodoTaskCache.user_oid == user_oid).all()
+    def _prune_old_cached_tasks(self) -> None:
+        rows = self.db.query(TodoTaskCache).all()
         for row in rows:
             try:
                 raw = json.loads(row.raw_json or "{}")
@@ -70,61 +69,37 @@ class DeltaSyncService:
                 self.db.delete(row)
         self.db.commit()
 
-    def _get_delta_state(self, user_oid: str, resource_type: str, graph_list_id: str | None = None) -> DeltaState | None:
+    def _get_delta_state(self, resource_type: str, graph_list_id: str | None = None) -> DeltaState | None:
         return (
             self.db.query(DeltaState)
-            .filter(
-                DeltaState.user_oid == user_oid,
-                DeltaState.resource_type == resource_type,
-                DeltaState.graph_list_id == graph_list_id,
-            )
+            .filter(DeltaState.resource_type == resource_type, DeltaState.graph_list_id == graph_list_id)
             .first()
         )
 
-    def _upsert_delta_state(self, user_oid: str, resource_type: str, delta_link: str, graph_list_id: str | None = None):
-        row = self._get_delta_state(user_oid, resource_type, graph_list_id)
+    def _upsert_delta_state(self, resource_type: str, delta_link: str, graph_list_id: str | None = None) -> None:
+        row = self._get_delta_state(resource_type, graph_list_id)
         if row:
             row.delta_link = delta_link
         else:
-            self.db.add(
-                DeltaState(
-                    user_oid=user_oid,
-                    graph_list_id=graph_list_id,
-                    resource_type=resource_type,
-                    delta_link=delta_link,
-                )
-            )
+            self.db.add(DeltaState(graph_list_id=graph_list_id, resource_type=resource_type, delta_link=delta_link))
 
-    def _sync_lists(self, user_oid: str) -> int:
-        state = self._get_delta_state(user_oid, "lists", None)
-        data = self.graph.list_delta(user_oid, state.delta_link if state else None)
+    def _sync_lists(self) -> int:
+        state = self._get_delta_state("lists", None)
+        data = self.graph.list_delta("", state.delta_link if state else None)
         changed = 0
 
         while True:
-            values = data.get("value", [])
-            for item in values:
+            for item in data.get("value", []):
                 graph_id = item.get("id")
                 if not graph_id:
                     continue
                 if "@removed" in item:
-                    (
-                        self.db.query(TodoListCache)
-                        .filter(TodoListCache.user_oid == user_oid, TodoListCache.graph_list_id == graph_id)
-                        .delete()
-                    )
-                    (
-                        self.db.query(TodoTaskCache)
-                        .filter(TodoTaskCache.user_oid == user_oid, TodoTaskCache.graph_list_id == graph_id)
-                        .delete()
-                    )
+                    self.db.query(TodoListCache).filter(TodoListCache.graph_list_id == graph_id).delete()
+                    self.db.query(TodoTaskCache).filter(TodoTaskCache.graph_list_id == graph_id).delete()
                     changed += 1
                     continue
 
-                row = (
-                    self.db.query(TodoListCache)
-                    .filter(TodoListCache.user_oid == user_oid, TodoListCache.graph_list_id == graph_id)
-                    .first()
-                )
+                row = self.db.query(TodoListCache).filter(TodoListCache.graph_list_id == graph_id).first()
                 if row:
                     row.display_name = item.get("displayName", row.display_name)
                     row.etag = item.get("@odata.etag")
@@ -132,7 +107,6 @@ class DeltaSyncService:
                 else:
                     self.db.add(
                         TodoListCache(
-                            user_oid=user_oid,
                             graph_list_id=graph_id,
                             display_name=item.get("displayName", "Unnamed"),
                             etag=item.get("@odata.etag"),
@@ -145,37 +119,31 @@ class DeltaSyncService:
             delta_link = data.get("@odata.deltaLink")
             next_link = data.get("@odata.nextLink")
             if delta_link:
-                self._upsert_delta_state(user_oid, "lists", delta_link)
+                self._upsert_delta_state("lists", delta_link)
                 break
             if next_link:
-                data = self.graph.list_delta(user_oid, next_link)
+                data = self.graph.list_delta("", next_link)
                 continue
             break
 
         self.db.commit()
         return changed
 
-    def _sync_tasks_for_list(self, user_oid: str, list_id: str) -> int:
-        state = self._get_delta_state(user_oid, "tasks", list_id)
-        data = self.graph.task_delta(user_oid, list_id, state.delta_link if state else None)
+    def _sync_tasks_for_list(self, list_id: str) -> int:
+        state = self._get_delta_state("tasks", list_id)
+        data = self.graph.task_delta("", list_id, state.delta_link if state else None)
         changed = 0
-        existing_rows = (
-            self.db.query(TodoTaskCache)
-            .filter(TodoTaskCache.user_oid == user_oid, TodoTaskCache.graph_list_id == list_id)
-            .all()
-        )
+        existing_rows = self.db.query(TodoTaskCache).filter(TodoTaskCache.graph_list_id == list_id).all()
         rows_by_task_id = {row.graph_task_id: row for row in existing_rows}
 
         while True:
-            values = data.get("value", [])
-            for item in values:
+            for item in data.get("value", []):
                 task_id = item.get("id")
                 if not task_id:
                     continue
 
                 row = rows_by_task_id.get(task_id)
                 if row and _is_local_only_task(row.raw_json):
-                    # Local-only mode: ignore upstream updates/removals for locally managed tasks.
                     continue
 
                 if "@removed" in item:
@@ -193,21 +161,14 @@ class DeltaSyncService:
                     continue
 
                 if not row:
-                    row = TodoTaskCache(
-                        user_oid=user_oid,
-                        graph_list_id=list_id,
-                        graph_task_id=task_id,
-                        title=item.get("title", ""),
-                        raw_json="{}",
-                    )
+                    row = TodoTaskCache(graph_list_id=list_id, graph_task_id=task_id, title=item.get("title", ""), raw_json="{}")
                     self.db.add(row)
                     rows_by_task_id[task_id] = row
 
                 if "title" in item and item.get("title") is not None:
                     row.title = item.get("title", row.title)
                 if "body" in item:
-                    body = item.get("body") or {}
-                    row.body_content = body.get("content")
+                    row.body_content = (item.get("body") or {}).get("content")
                 if "importance" in item:
                     row.importance = item.get("importance")
                 if "status" in item:
@@ -224,7 +185,7 @@ class DeltaSyncService:
                     row.pool = ext.get("pool")
                     row.wf_status = ext.get("wfStatus")
                     row.trigger_ref = ext.get("triggerRef")
-                # Auto-link imported tasks with due date/recurrence to built-in date trigger types.
+
                 if (not row.trigger_ref) and row.due_datetime:
                     recurrence_type = None
                     if row.recurrence_json:
@@ -245,6 +206,7 @@ class DeltaSyncService:
                         row.trigger_ref = "date"
                 elif row.trigger_ref and row.trigger_ref.startswith("date") and not row.due_datetime:
                     row.trigger_ref = None
+
                 row.raw_json = json.dumps(item)
                 row.deleted = False
                 changed += 1
@@ -252,10 +214,10 @@ class DeltaSyncService:
             delta_link = data.get("@odata.deltaLink")
             next_link = data.get("@odata.nextLink")
             if delta_link:
-                self._upsert_delta_state(user_oid, "tasks", delta_link, graph_list_id=list_id)
+                self._upsert_delta_state("tasks", delta_link, graph_list_id=list_id)
                 break
             if next_link:
-                data = self.graph.task_delta(user_oid, list_id, next_link)
+                data = self.graph.task_delta("", list_id, next_link)
                 continue
             break
 
