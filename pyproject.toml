@@ -1,0 +1,27 @@
+[project]
+name = "triggertodo-backend"
+version = "0.1.0"
+description = "FastAPI + SQLite backend for TriggerToDo"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.116.1",
+    "uvicorn[standard]==0.35.0",
+    "sqlalchemy==2.0.43",
+    "pydantic-settings==2.10.1",
+    "msal==1.30.0",
+    "requests==2.32.4",
+    "cryptography==44.0.3",
+    "apscheduler==3.10.4",
+    "python-multipart==0.0.20",
+    "itsdangerous==2.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.4.2",
+    "pytest-cov==5.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=35"
