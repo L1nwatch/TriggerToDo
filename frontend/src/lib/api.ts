@@ -46,14 +46,6 @@ function asCollection<T>(payload: unknown): T[] {
   return []
 }
 
-export async function getCurrentUser() {
-  return request<{ session: { name?: string; email?: string } }>('/api/auth/me')
-}
-
-export async function logout() {
-  return request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' })
-}
-
 export async function listTodoLists() {
   const payload = await request<unknown>('/api/todo/lists')
   return asCollection<TodoList>(payload)

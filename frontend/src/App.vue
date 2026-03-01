@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { authState, refreshAuth } from './lib/auth'
 import { fetchAllTasks, listEpics } from './lib/api'
 import { isOnOrAfterBoardCutoff } from './lib/boardCutoff'
 import { hasAnyTriggerConfigured } from './lib/triggerSignal'
@@ -22,15 +21,12 @@ const activePath = computed(() => {
   return '/board/triggered'
 })
 
-const isLoginPage = computed(() => route.name === 'login')
-
 function isCompletedStatus(status?: string) {
   const value = (status || '').toLowerCase()
   return value.includes('done') || value.includes('closed') || value.includes('resolved') || value.includes('complete')
 }
 
 async function loadSidebarCounts() {
-  if (!authState.authenticated || isLoginPage.value) return
   try {
     const [data, epicsData] = await Promise.all([fetchAllTasks(), listEpics()])
     const openTasks = data.tasks.filter((task) => task.status !== 'completed' && isOnOrAfterBoardCutoff(task))
@@ -45,7 +41,6 @@ async function loadSidebarCounts() {
 }
 
 onMounted(async () => {
-  await refreshAuth()
   await loadSidebarCounts()
 })
 
@@ -59,36 +54,34 @@ watch(
 
 <template>
   <div class="app-frame">
-    <template v-if="!isLoginPage">
-      <aside class="side-nav">
-        <div class="brand-block">
-          <p class="brand">TriggerToDo</p>
-          <p class="brand-sub">Plan by trigger, execute with focus</p>
-        </div>
-        <el-menu :default-active="activePath" router class="menu">
-          <el-menu-item index="/epics">
-            <span class="menu-item-row">
-              <span>Epics</span>
-              <el-tag size="small" effect="dark" class="nav-count nav-count-epics">{{ sidebarCounts.epics }}</el-tag>
-            </span>
-          </el-menu-item>
-          <el-menu-item index="/board/triggered">
-            <span class="menu-item-row">
-              <span>Trigger Set</span>
-              <el-tag size="small" effect="dark" class="nav-count nav-count-triggered">{{ sidebarCounts.triggered }}</el-tag>
-            </span>
-          </el-menu-item>
-          <el-menu-item index="/board/waiting-trigger">
-            <span class="menu-item-row">
-              <span>Trigger Missing</span>
-              <el-tag size="small" effect="dark" class="nav-count nav-count-waiting">{{ sidebarCounts.waiting }}</el-tag>
-            </span>
-          </el-menu-item>
-          <el-menu-item index="/triggers">Triggers</el-menu-item>
-          <el-menu-item index="/events">Events</el-menu-item>
-        </el-menu>
-      </aside>
-    </template>
+    <aside class="side-nav">
+      <div class="brand-block">
+        <p class="brand">TriggerToDo</p>
+        <p class="brand-sub">Plan by trigger, execute with focus</p>
+      </div>
+      <el-menu :default-active="activePath" router class="menu">
+        <el-menu-item index="/epics">
+          <span class="menu-item-row">
+            <span>Epics</span>
+            <el-tag size="small" effect="dark" class="nav-count nav-count-epics">{{ sidebarCounts.epics }}</el-tag>
+          </span>
+        </el-menu-item>
+        <el-menu-item index="/board/triggered">
+          <span class="menu-item-row">
+            <span>Trigger Set</span>
+            <el-tag size="small" effect="dark" class="nav-count nav-count-triggered">{{ sidebarCounts.triggered }}</el-tag>
+          </span>
+        </el-menu-item>
+        <el-menu-item index="/board/waiting-trigger">
+          <span class="menu-item-row">
+            <span>Trigger Missing</span>
+            <el-tag size="small" effect="dark" class="nav-count nav-count-waiting">{{ sidebarCounts.waiting }}</el-tag>
+          </span>
+        </el-menu-item>
+        <el-menu-item index="/triggers">Triggers</el-menu-item>
+        <el-menu-item index="/events">Events</el-menu-item>
+      </el-menu>
+    </aside>
 
     <main class="content">
       <router-view />
