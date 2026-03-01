@@ -11,8 +11,6 @@ from app.config import get_settings
 from app.db import Base, engine
 from app.routes_epic import router as epic_router
 from app.routes_event import router as event_router
-from app.routes_jira import router as jira_router
-from app.routes_sync import router as sync_router
 from app.routes_todo import router as todo_router
 from app.routes_trigger import router as trigger_router
 from app.trigger_engine import TriggerEngine
@@ -54,9 +52,7 @@ app.add_middleware(
 
 app.include_router(epic_router)
 app.include_router(event_router)
-app.include_router(jira_router)
 app.include_router(todo_router)
-app.include_router(sync_router)
 app.include_router(trigger_router)
 
 
