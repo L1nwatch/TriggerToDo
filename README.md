@@ -11,7 +11,6 @@ FastAPI + SQLite backend for a SPA running in local-DB mode.
   - `pool`
   - `wfStatus`
   - `triggerRef`
-- JSON bootstrap import/export scripts (`initialize_data.json`)
 - Trigger engine:
   - Background scheduler
   - Authenticated webhook endpoint
@@ -29,40 +28,24 @@ This script will:
 - install backend/frontend dependencies
 - build frontend assets
 - create DB schema
-- import `initialize_data.json` if the file exists
 
-2. Import bootstrap data manually (if not already imported by `initialize.sh`):
-
-```bash
-# cp initialize_data.example.json initialize_data.json
-uv run python scripts/import_initialize_json.py --file initialize_data.json --replace
-```
-
-3. Run server:
+2. Run server:
 
 ```bash
 uv run uvicorn app.main:app --reload
 ```
 
-4. Open `http://localhost:8000/api/health`
+3. Open `http://localhost:8000/api/health`
 
-## One-time data migration workflow
+## Deploy With Existing DB
 
-Use this when migrating data from an environment that already has imported Jira/Microsoft To Do data:
+If you already have data, deploy the SQLite file directly:
 
-1. Export:
+1. Copy `triggertodo.db` to server.
+2. Set `DATABASE_URL=sqlite:///./triggertodo.db`.
+3. Start server.
 
-```bash
-uv run python scripts/export_initialize_json.py --file initialize_data.json
-```
-
-2. Upload `initialize_data.json` to your server.
-
-3. Import on server:
-
-```bash
-uv run python scripts/import_initialize_json.py --file initialize_data.json --replace
-```
+`initialize_data.json` scripts are optional and no longer required for normal deployment.
 
 ## Testing
 
