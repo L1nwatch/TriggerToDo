@@ -9,7 +9,6 @@ import {
   listEpics,
   fetchAllTasks,
   listTriggerEvents,
-  syncDelta,
   updateTask,
 } from '../lib/api'
 import { BOARD_CUTOFF_ISO } from '../lib/boardCutoff'
@@ -156,14 +155,11 @@ function resetCreateForm() {
   Object.assign(createForm, defaultTaskForm(lists.value[0]?.id || ''))
 }
 
-async function loadData(forceSync = false) {
+async function loadData() {
   loading.value = true
   try {
     epicLoading.value = true
     await loadEpicPriorities()
-    if (forceSync) {
-      await syncDelta()
-    }
     triggerLoading.value = true
     const [data, eventsData] = await Promise.all([fetchAllTasks(), listTriggerEvents()])
     tasks.value = data.tasks

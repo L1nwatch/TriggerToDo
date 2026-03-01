@@ -6,7 +6,6 @@ import {
   deleteTriggerRule,
   listTriggerRules,
   runTriggersNow,
-  syncDelta,
   updateTriggerRule,
 } from '../lib/api'
 import type { TriggerRule } from '../lib/types'
@@ -103,15 +102,6 @@ async function runNow() {
   }
 }
 
-async function syncNow() {
-  try {
-    await syncDelta()
-    ElMessage.success('Delta sync completed')
-  } catch (error) {
-    ElMessage.error((error as Error).message || 'Failed to sync')
-  }
-}
-
 onMounted(loadRules)
 </script>
 
@@ -123,7 +113,6 @@ onMounted(loadRules)
         <p>Configure trigger rules and maintenance actions</p>
       </div>
       <div class="actions">
-        <el-button @click="syncNow">Run Delta Sync</el-button>
         <el-button type="warning" @click="runNow">Run Triggers Now</el-button>
       </div>
     </header>

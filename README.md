@@ -67,8 +67,6 @@ Coverage is enforced from `pyproject.toml` with a minimum threshold of 35%.
   - `PATCH /api/todo/tasks/{task_id}` (list-agnostic task update)
   - `POST /api/todo/lists/{list_id}/tasks/{task_id}/complete`
   - `GET /api/todo/cache/tasks`
-- Sync
-  - `POST /api/sync/delta`
 - Triggers
   - `GET|POST /api/triggers`
   - `PATCH|DELETE /api/triggers/{rule_id}`

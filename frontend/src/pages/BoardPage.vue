@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import TaskEditDialog from '../components/TaskEditDialog.vue'
-import { completeTask, fetchAllTasks, listEpics, listTriggerEvents, syncDelta, updateTask, updateTaskById } from '../lib/api'
+import { completeTask, fetchAllTasks, listEpics, listTriggerEvents, updateTask, updateTaskById } from '../lib/api'
 import { BOARD_CUTOFF_ISO, isOnOrAfterBoardCutoff } from '../lib/boardCutoff'
 import { builtInTriggerOptions, isDateTriggerRef } from '../lib/triggerCatalog'
 import { hasAnyTriggerConfigured, isTaskTriggered, triggerDisplay } from '../lib/triggerSignal'
@@ -133,12 +133,9 @@ const waitingTasks = computed(() =>
     }),
 )
 
-async function loadBoard(forceSync = false) {
+async function loadBoard() {
   loading.value = true
   try {
-    if (forceSync) {
-      await syncDelta()
-    }
     triggerLoading.value = true
     epicLoading.value = true
     const [data, eventsData, epicsData] = await Promise.all([

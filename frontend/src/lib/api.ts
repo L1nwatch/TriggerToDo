@@ -213,12 +213,6 @@ export async function queryCachedTasks(params?: { pool?: string; wfStatus?: stri
   }>(`/api/todo/cache/tasks${search.toString() ? `?${search.toString()}` : ''}`)
 }
 
-export async function syncDelta() {
-  return request<{ ok: boolean; lists_synced?: number; tasks_synced?: number }>('/api/sync/delta', {
-    method: 'POST',
-  })
-}
-
 export async function listEpics() {
   return request<{
     count: number
@@ -332,48 +326,5 @@ export async function updateTriggerEvent(eventId: number, payload: { name?: stri
 export async function deleteTriggerEvent(eventId: number) {
   return request<{ ok: boolean }>(`/api/events/${eventId}`, {
     method: 'DELETE',
-  })
-}
-
-export async function listJiraEpics(projectKey: string, maxResults = 50) {
-  return request<{
-    project: string
-    total: number
-    count: number
-    issues: Array<{
-      id: string
-      key: string
-      source: 'jira'
-      summary: string
-      status?: string
-      priority?: string
-      issueType?: string
-      parentKey?: string
-    }>
-  }>(`/api/jira/projects/${encodeURIComponent(projectKey)}/epics?max_results=${maxResults}`)
-}
-
-export async function listJiraIssues(projectKey: string, maxResults = 100) {
-  return request<{
-    project: string
-    total: number
-    count: number
-    issues: Array<{
-      id: string
-      key: string
-      source: 'jira'
-      summary: string
-      status?: string
-      priority?: string
-      issueType?: string
-      parentKey?: string
-    }>
-  }>(`/api/jira/projects/${encodeURIComponent(projectKey)}/issues?max_results=${maxResults}`)
-}
-
-export async function updateJiraIssue(issueKey: string, payload: { summary?: string }) {
-  return request<{ ok: boolean; issueKey: string }>(`/api/jira/issues/${encodeURIComponent(issueKey)}`, {
-    method: 'PATCH',
-    body: JSON.stringify(payload),
   })
 }
