@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { createEpic, listEpics, listTriggerEvents, queryCachedTasks, updateEpic } from '../lib/api'
@@ -23,6 +23,8 @@ const rows = ref<EpicRow[]>([])
 const creating = ref(false)
 const editDialogVisible = ref(false)
 const savingEdit = ref(false)
+const isMobile = ref(false)
+let mobileMediaQuery: MediaQueryList | null = null
 const editEpic = ref<{
   id: number
   key: string
@@ -45,6 +47,7 @@ const linkedTasks = ref<
     wfStatus?: string
     workflowDisplay: string
     triggerRef?: string
+    triggerDisplay: string
   }>
 >([])
 const tasksByEpicKey = ref(
@@ -57,6 +60,7 @@ const tasksByEpicKey = ref(
       wfStatus?: string
       workflowDisplay: string
       triggerRef?: string
+      triggerDisplay: string
     }>
   >(),
 )
@@ -90,18 +94,11 @@ function priorityTagType(priorityTag: 'P0' | 'P1' | 'P2' | 'P3') {
   return 'info'
 }
 
-function statusTagType(status?: string) {
-  const value = String(status || '').toLowerCase()
-  if (!value) return 'info'
-  if (value.includes('progress') || value.includes('doing') || value.includes('active')) return 'warning'
-  if (value.includes('done') || value.includes('closed') || value.includes('resolved') || value.includes('complete')) return 'success'
-  if (value.includes('block')) return 'danger'
-  return 'info'
-}
-
 const total = computed(() => rows.value.length)
 const highPriorityCount = computed(() => rows.value.filter((row) => row.priorityTag === 'P0' || row.priorityTag === 'P1').length)
 const linkedTaskTotal = computed(() => rows.value.reduce((sum, row) => sum + row.linkedTasks, 0))
+const editDialogWidth = computed(() => (isMobile.value ? '92vw' : '560px'))
+const linkedTasksDialogWidth = computed(() => (isMobile.value ? '92vw' : '760px'))
 
 function normalizeWorkflowStatus(raw?: string): string {
   const value = String(raw || '').trim().toLowerCase()
@@ -118,6 +115,20 @@ function workflowLabel(value: string): string {
   if (value === 'wait-for-trigger') return 'Pending Trigger'
   if (value === 'missing-trigger') return 'Missing Trigger'
   return value || '-'
+}
+
+function triggerLabel(ref: string | undefined, eventsById: Map<number, TriggerEvent>): string {
+  const value = String(ref || '').trim()
+  if (!value) return 'Missing Trigger'
+  const lower = value.toLowerCase()
+  if (lower.startsWith('event:')) {
+    const id = Number(lower.slice('event:'.length))
+    const eventName = Number.isFinite(id) ? eventsById.get(id)?.name : ''
+    return eventName ? `Event: ${eventName}` : value
+  }
+  if (lower === 'date') return 'Date Trigger'
+  if (lower.startsWith('date:')) return `Date Trigger (${lower.slice('date:'.length)})`
+  return value
 }
 
 function toSignalTask(item: {
@@ -191,6 +202,7 @@ async function loadEpics() {
         wfStatus?: string
         workflowDisplay: string
         triggerRef?: string
+        triggerDisplay: string
       }>
     >()
 
@@ -207,6 +219,7 @@ async function loadEpics() {
         wfStatus: task.wfStatus,
         workflowDisplay: effectiveWorkflowStatus(task, eventsById),
         triggerRef: task.triggerRef,
+        triggerDisplay: triggerLabel(task.triggerRef, eventsById),
       })
       taskMap.set(epicKey, tasks)
     }
@@ -314,6 +327,21 @@ async function submitNewEpic() {
 }
 
 onMounted(loadEpics)
+
+function syncMobileLayout() {
+  if (!mobileMediaQuery) return
+  isMobile.value = mobileMediaQuery.matches
+}
+
+onMounted(() => {
+  mobileMediaQuery = window.matchMedia('(max-width: 900px)')
+  syncMobileLayout()
+  mobileMediaQuery.addEventListener('change', syncMobileLayout)
+})
+
+onBeforeUnmount(() => {
+  mobileMediaQuery?.removeEventListener('change', syncMobileLayout)
+})
 </script>
 
 <template>
@@ -376,16 +404,17 @@ onMounted(loadEpics)
           <template #default="scope">
             <div class="epic-name-cell">
               <span class="epic-name-text">{{ scope.row.name }}</span>
+              <el-tag v-if="isMobile" size="small" effect="dark" :type="priorityTagType(scope.row.priorityTag)">{{ scope.row.priorityTag }}</el-tag>
               <el-button v-if="editMode" size="small" type="primary" @click="openEdit(scope.row)">Edit</el-button>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="Priority" width="110">
+        <el-table-column v-if="!isMobile" label="Priority" width="110">
           <template #default="scope">
             <el-tag effect="dark" :type="priorityTagType(scope.row.priorityTag)">{{ scope.row.priorityTag }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Linked" width="90">
+        <el-table-column label="Linked" :width="isMobile ? 76 : 90">
           <template #default="scope">
             <el-button
               v-if="scope.row.linkedTasks > 0"
@@ -399,15 +428,10 @@ onMounted(loadEpics)
             <el-tag v-else effect="plain" type="info" class="linked-tag">0</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Status" width="130">
-          <template #default="scope">
-            <el-tag effect="plain" :type="statusTagType(scope.row.status)">{{ scope.row.status || 'Unknown' }}</el-tag>
-          </template>
-        </el-table-column>
       </el-table>
     </el-card>
 
-    <el-dialog v-model="editDialogVisible" title="Edit Epic" width="560px">
+    <el-dialog v-model="editDialogVisible" title="Edit Epic" :width="editDialogWidth">
       <el-form v-if="editEpic" label-position="top" @submit.prevent>
         <el-form-item label="Epic name">
           <el-input v-model="editEpic.name" />
@@ -429,7 +453,7 @@ onMounted(loadEpics)
       </template>
     </el-dialog>
 
-    <el-dialog v-model="linkedTasksDialogVisible" title="Linked Tasks" width="760px">
+    <el-dialog v-model="linkedTasksDialogVisible" title="Linked Tasks" :width="linkedTasksDialogWidth">
       <el-table :data="linkedTasks" empty-text="No linked tasks">
         <el-table-column prop="title" label="Task" min-width="260" show-overflow-tooltip />
         <el-table-column label="Workflow" width="130">
@@ -439,7 +463,7 @@ onMounted(loadEpics)
         </el-table-column>
         <el-table-column label="Trigger" min-width="130" show-overflow-tooltip>
           <template #default="scope">
-            {{ scope.row.triggerRef || '-' }}
+            {{ scope.row.triggerDisplay }}
           </template>
         </el-table-column>
         <el-table-column label="Action" width="90">

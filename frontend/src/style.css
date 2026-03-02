@@ -586,6 +586,17 @@ body {
   white-space: nowrap;
 }
 
+@media (max-width: 900px) {
+  .epic-name-cell {
+    align-items: center;
+    gap: 6px;
+  }
+
+  .epic-name-text {
+    flex: 1;
+  }
+}
+
 .board-col:nth-child(1) {
   --col-accent: #c18a22;
   --col-soft: #fff5dd;
@@ -850,6 +861,10 @@ body {
     align-items: stretch;
   }
 
+  .page-head h1 {
+    font-size: 24px;
+  }
+
   .search {
     min-width: 0;
     width: 100%;
@@ -872,6 +887,36 @@ body {
   .task-actions-inline {
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .board-col {
+    min-width: 250px;
+  }
+
+  .settings-block,
+  .settings-block .el-card__body {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .settings-block .el-table {
+    width: 100% !important;
+  }
+
+  .settings-block .el-table .cell {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .el-dialog {
+    width: 92vw !important;
+    max-width: 92vw;
+    margin-top: 5vh !important;
+  }
+
+  .el-dialog__body {
+    max-height: 68vh;
+    overflow: auto;
   }
 
   .event-create-row {
