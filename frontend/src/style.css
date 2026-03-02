@@ -846,10 +846,40 @@ body {
     border-right: 0;
     border-bottom: 1px solid var(--line);
     gap: 8px;
+    position: static;
+    height: auto;
+    max-height: none;
+    padding: 10px 12px;
   }
 
   .user-block {
-    margin-top: 8px;
+    display: none;
+  }
+
+  .brand-block {
+    padding: 8px 10px;
+  }
+
+  .brand-sub {
+    display: none;
+  }
+
+  .menu {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .menu.el-menu .el-menu-item {
+    flex: 0 0 auto;
+    width: auto;
+    margin-bottom: 0;
+    padding: 0 10px;
+  }
+
+  .menu-item-row {
+    gap: 6px;
   }
 
   .content {
@@ -890,7 +920,19 @@ body {
   }
 
   .board-col {
-    min-width: 250px;
+    min-width: 0;
+  }
+
+  .board-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    overflow: visible;
+    gap: 10px;
+  }
+
+  .drop-zone,
+  .drop-zone-fill {
+    min-height: 0;
   }
 
   .settings-block,
@@ -901,6 +943,16 @@ body {
 
   .settings-block .el-table {
     width: 100% !important;
+  }
+
+  .settings-block .el-table__inner-wrapper,
+  .settings-block .el-table__header-wrapper,
+  .settings-block .el-table__body-wrapper {
+    overflow-x: auto;
+  }
+
+  .settings-block .el-table table {
+    min-width: 620px;
   }
 
   .settings-block .el-table .cell {
