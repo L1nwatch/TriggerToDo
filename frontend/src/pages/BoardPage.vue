@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import TaskEditDialog from '../components/TaskEditDialog.vue'
-import { completeTask, fetchAllTasks, listEpics, listTriggerEvents, updateTask, updateTaskById } from '../lib/api'
+import { completeTask, createTask, fetchAllTasks, listEpics, listTriggerEvents, updateTask, updateTaskById } from '../lib/api'
 import { BOARD_CUTOFF_ISO, isOnOrAfterBoardCutoff } from '../lib/boardCutoff'
 import { builtInTriggerOptions, isDateTriggerRef } from '../lib/triggerCatalog'
 import { hasAnyTriggerConfigured, isTaskTriggered, triggerDisplay } from '../lib/triggerSignal'
@@ -24,6 +24,8 @@ const draggingKey = ref('')
 const editDialogVisible = ref(false)
 const editingTask = ref<TodoTask | null>(null)
 const editForm = reactive<TaskFormModel>(defaultTaskForm(''))
+const createDialogVisible = ref(false)
+const createForm = reactive<TaskFormModel>(defaultTaskForm(''))
 
 const statuses = computed(() =>
   selectedPool.value === 'waiting-trigger'
@@ -160,12 +162,42 @@ async function loadBoard() {
       if (isCompletedStatus(task.status)) return false
       return isOnOrAfterBoardCutoff(task)
     })
+    if (!createForm.listId) createForm.listId = data.lists[0]?.id || ''
   } catch (error) {
     ElMessage.error((error as Error).message || 'Failed to load board')
   } finally {
     triggerLoading.value = false
     epicLoading.value = false
     loading.value = false
+  }
+}
+
+function openCreate() {
+  Object.assign(createForm, defaultTaskForm(lists.value[0]?.id || ''))
+  createForm.wfStatus = 'wait-for-trigger'
+  createDialogVisible.value = true
+}
+
+async function submitCreate() {
+  if (!createForm.title.trim() || !createForm.listId) {
+    ElMessage.warning('Title and list are required')
+    return
+  }
+  if (isDateTriggerRef(createForm.triggerRef) && !createForm.dueAt) {
+    ElMessage.warning('Date trigger requires due date')
+    return
+  }
+
+  saving.value = true
+  try {
+    await createTask(createForm.listId, taskPayloadFromForm(createForm, { includeSource: true }) as never)
+    createDialogVisible.value = false
+    await loadBoard()
+    ElMessage.success('Task created')
+  } catch (error) {
+    ElMessage.error((error as Error).message || 'Failed to create task')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -256,6 +288,7 @@ onMounted(loadBoard)
           }}
         </p>
       </div>
+      <el-button v-if="selectedPool === 'waiting-trigger'" type="primary" @click="openCreate">Create Task</el-button>
     </header>
 
     <el-skeleton :loading="loading" animated :rows="6" v-if="loading" />
@@ -316,6 +349,25 @@ onMounted(loadBoard)
         </div>
       </article>
     </div>
+
+    <TaskEditDialog
+      v-model="createDialogVisible"
+      :model="createForm"
+      :lists="lists"
+      :readonly-list="false"
+      :hide-workflow-status="false"
+      :saving="saving"
+      title="Create Task"
+      save-text="Create"
+      :trigger-options="[
+        ...builtInTriggerOptions(),
+        ...triggerEvents.map((event) => ({ value: `event:${event.id}`, label: `event-trigger: ${event.name}${event.is_active ? ' (occurred)' : ''}` })),
+      ]"
+      :trigger-loading="triggerLoading"
+      :epic-options="epicOptions"
+      :epic-loading="epicLoading"
+      @save="submitCreate"
+    />
 
     <TaskEditDialog
       v-model="editDialogVisible"
