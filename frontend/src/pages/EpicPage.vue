@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { listEpics, queryCachedTasks, updateEpic } from '../lib/api'
+import { createEpic, listEpics, listTriggerEvents, queryCachedTasks, updateEpic } from '../lib/api'
+import { hasAnyTriggerConfigured, isTaskTriggered } from '../lib/triggerSignal'
+import type { TodoTask, TriggerEvent } from '../lib/types'
 
 type EpicRow = {
   id: number
@@ -14,8 +17,50 @@ type EpicRow = {
 }
 
 const loading = ref(false)
+const router = useRouter()
 const editMode = ref(false)
 const rows = ref<EpicRow[]>([])
+const creating = ref(false)
+const editDialogVisible = ref(false)
+const savingEdit = ref(false)
+const editEpic = ref<{
+  id: number
+  key: string
+  name: string
+  priorityTag: 'P0' | 'P1' | 'P2' | 'P3'
+} | null>(null)
+const newEpic = ref<{
+  name: string
+  priorityTag: 'P0' | 'P1' | 'P2' | 'P3'
+}>({
+  name: '',
+  priorityTag: 'P2',
+})
+const linkedTasksDialogVisible = ref(false)
+const linkedTasksDialogTitle = ref('')
+const linkedTasks = ref<
+  Array<{
+    taskId: string
+    listId: string
+    title: string
+    wfStatus?: string
+    workflowDisplay: string
+    triggerRef?: string
+  }>
+>([])
+const tasksByEpicKey = ref(
+  new Map<
+    string,
+    Array<{
+      taskId: string
+      listId: string
+      title: string
+      wfStatus?: string
+      workflowDisplay: string
+      triggerRef?: string
+    }>
+  >(),
+)
 
 function isCompletedStatus(status?: string) {
   const value = (status || '').toLowerCase()
@@ -59,18 +104,114 @@ const total = computed(() => rows.value.length)
 const highPriorityCount = computed(() => rows.value.filter((row) => row.priorityTag === 'P0' || row.priorityTag === 'P1').length)
 const linkedTaskTotal = computed(() => rows.value.reduce((sum, row) => sum + row.linkedTasks, 0))
 
+function normalizeWorkflowStatus(raw?: string): string {
+  const value = String(raw || '').trim().toLowerCase()
+  if (!value) return ''
+  if (value === 'wait-for-trigger' || value === 'wait trigger' || value === 'wait-trigger' || value === 'wait for trigger') {
+    return 'wait-for-trigger'
+  }
+  if (value === 'missing-trigger' || value === 'missing trigger') return 'missing-trigger'
+  if (value === 'todo' || value === 'doing') return value
+  return value
+}
+
+function workflowLabel(value: string): string {
+  if (value === 'wait-for-trigger') return 'Pending Trigger'
+  if (value === 'missing-trigger') return 'Missing Trigger'
+  return value || '-'
+}
+
+function toSignalTask(item: {
+  taskId: string
+  listId: string
+  title: string
+  dueDateTime?: string
+  dueTimeZone?: string
+  recurrenceJson?: string
+  triggerRef?: string
+}): TodoTask {
+  let recurrence: TodoTask['recurrence'] = null
+  if (item.recurrenceJson) {
+    try {
+      recurrence = JSON.parse(item.recurrenceJson) as TodoTask['recurrence']
+    } catch {
+      recurrence = null
+    }
+  }
+  return {
+    id: item.taskId,
+    listId: item.listId,
+    title: item.title,
+    source: 'triggertodo',
+    dueDateTime: item.dueDateTime
+      ? { dateTime: item.dueDateTime, timeZone: item.dueTimeZone || 'UTC' }
+      : null,
+    recurrence,
+    extensions: [
+      {
+        extensionName: 'com.triggertodo.meta',
+        triggerRef: item.triggerRef || null,
+      },
+    ],
+  }
+}
+
+function effectiveWorkflowStatus(
+  item: {
+    taskId: string
+    listId: string
+    title: string
+    wfStatus?: string
+    dueDateTime?: string
+    dueTimeZone?: string
+    recurrenceJson?: string
+    triggerRef?: string
+  },
+  eventsById: Map<number, TriggerEvent>,
+): string {
+  const normalized = normalizeWorkflowStatus(item.wfStatus)
+  if (normalized === 'missing-trigger') return normalized
+  const task = toSignalTask(item)
+  if (!hasAnyTriggerConfigured(task)) return 'missing-trigger'
+  if (hasAnyTriggerConfigured(task) && !isTaskTriggered(task, eventsById)) return 'wait-for-trigger'
+  return normalized || '-'
+}
+
 async function loadEpics() {
   loading.value = true
   try {
-    const [epicsData, tasksData] = await Promise.all([listEpics(), queryCachedTasks()])
+    const [epicsData, tasksData, eventsData] = await Promise.all([listEpics(), queryCachedTasks(), listTriggerEvents()])
+    const eventsById = new Map<number, TriggerEvent>(eventsData.items.map((event) => [event.id, event]))
     const linkedByEpic = new Map<string, number>()
+    const taskMap = new Map<
+      string,
+      Array<{
+        taskId: string
+        listId: string
+        title: string
+        wfStatus?: string
+        workflowDisplay: string
+        triggerRef?: string
+      }>
+    >()
 
     for (const task of tasksData.items) {
       if (String(task.status || '').toLowerCase() === 'completed') continue
       const epicKey = String(task.epicKey || '').trim().toUpperCase()
       if (!epicKey) continue
       linkedByEpic.set(epicKey, (linkedByEpic.get(epicKey) || 0) + 1)
+      const tasks = taskMap.get(epicKey) || []
+      tasks.push({
+        taskId: task.taskId,
+        listId: task.listId,
+        title: task.title,
+        wfStatus: task.wfStatus,
+        workflowDisplay: effectiveWorkflowStatus(task, eventsById),
+        triggerRef: task.triggerRef,
+      })
+      taskMap.set(epicKey, tasks)
     }
+    tasksByEpicKey.value = taskMap
 
     rows.value = epicsData.items
       .filter((item) => !isCompletedStatus(item.status))
@@ -94,22 +235,77 @@ async function loadEpics() {
   }
 }
 
-async function saveEpic(row: EpicRow) {
-  const name = row.name.trim()
+function openLinkedTasks(row: EpicRow) {
+  const epicKey = String(row.key || '').trim().toUpperCase()
+  linkedTasks.value = tasksByEpicKey.value.get(epicKey) || []
+  linkedTasksDialogTitle.value = `${row.key} Linked Tasks`
+  linkedTasksDialogVisible.value = true
+}
+
+function viewTask(task: { listId: string; taskId: string }) {
+  linkedTasksDialogVisible.value = false
+  router.push(`/tasks/${encodeURIComponent(task.listId)}/${encodeURIComponent(task.taskId)}`)
+}
+
+function openEdit(row: EpicRow) {
+  editEpic.value = {
+    id: row.id,
+    key: row.key,
+    name: row.name,
+    priorityTag: row.priorityTag,
+  }
+  editDialogVisible.value = true
+}
+
+async function submitEdit() {
+  if (!editEpic.value) return
+  const name = editEpic.value.name.trim()
   if (!name) {
     ElMessage.warning('Epic name is required')
     return
   }
 
-  row.saving = true
+  savingEdit.value = true
   try {
-    await updateEpic(row.id, { name, priority: row.priorityTag })
-    ElMessage.success(`Updated ${row.key}`)
+    await updateEpic(editEpic.value.id, { name, priority: editEpic.value.priorityTag })
+    ElMessage.success(`Updated ${editEpic.value.key}`)
+    editDialogVisible.value = false
+    editEpic.value = null
     await loadEpics()
   } catch (error) {
     ElMessage.error((error as Error).message || 'Failed to update epic')
   } finally {
-    row.saving = false
+    savingEdit.value = false
+  }
+}
+
+async function submitNewEpic() {
+  if (!editMode.value) {
+    ElMessage.warning('Enable Edit Mode to add epics')
+    return
+  }
+
+  const name = newEpic.value.name.trim()
+
+  if (!name) {
+    ElMessage.warning('Epic name is required')
+    return
+  }
+
+  creating.value = true
+  try {
+    await createEpic({
+      name,
+      priority: newEpic.value.priorityTag,
+      status: 'Open',
+    })
+    ElMessage.success('Epic created')
+    newEpic.value = { name: '', priorityTag: 'P2' }
+    await loadEpics()
+  } catch (error) {
+    ElMessage.error((error as Error).message || 'Failed to create epic')
+  } finally {
+    creating.value = false
   }
 }
 
@@ -145,47 +341,112 @@ onMounted(loadEpics)
       </article>
     </section>
 
-    <el-table :data="rows" v-loading="loading" empty-text="No epics found" class="epic-table">
-      <el-table-column label="Name" min-width="460">
-        <template #default="scope">
-          <template v-if="editMode">
-            <el-input v-model="scope.row.name" />
+    <el-card v-if="editMode">
+      <template #header>
+        <strong>Create Epic</strong>
+      </template>
+      <el-form label-position="top" @submit.prevent>
+        <el-form-item label="Epic name">
+          <el-input v-model="newEpic.name" placeholder="Epic name" clearable />
+        </el-form-item>
+        <el-form-item label="Priority">
+          <el-select v-model="newEpic.priorityTag" class="field-full">
+            <el-option label="P0" value="P0" />
+            <el-option label="P1" value="P1" />
+            <el-option label="P2" value="P2" />
+            <el-option label="P3" value="P3" />
+          </el-select>
+        </el-form-item>
+        <div class="actions">
+          <el-button type="primary" :loading="creating" @click="submitNewEpic">Create</el-button>
+        </div>
+      </el-form>
+    </el-card>
+
+    <el-card class="settings-block" v-loading="loading">
+      <template #header>
+        <strong>Epics</strong>
+      </template>
+      <el-table :data="rows" empty-text="No epics found" class="epic-table">
+        <el-table-column label="Name" min-width="220" show-overflow-tooltip>
+          <template #default="scope">
+            <div class="epic-name-cell">
+              <span class="epic-name-text">{{ scope.row.name }}</span>
+              <el-button v-if="editMode" size="small" type="primary" @click="openEdit(scope.row)">Edit</el-button>
+            </div>
           </template>
-          <template v-else>
-            {{ scope.row.name }}
-          </template>
-        </template>
-      </el-table-column>
-      <el-table-column label="Priority" width="120">
-        <template #default="scope">
-          <template v-if="editMode">
-            <el-select v-model="scope.row.priorityTag">
-              <el-option label="P0" value="P0" />
-              <el-option label="P1" value="P1" />
-              <el-option label="P2" value="P2" />
-              <el-option label="P3" value="P3" />
-            </el-select>
-          </template>
-          <template v-else>
+        </el-table-column>
+        <el-table-column label="Priority" width="110">
+          <template #default="scope">
             <el-tag effect="dark" :type="priorityTagType(scope.row.priorityTag)">{{ scope.row.priorityTag }}</el-tag>
           </template>
-        </template>
-      </el-table-column>
-      <el-table-column label="Linked Tasks" width="130">
-        <template #default="scope">
-          <el-tag effect="plain" type="success" class="linked-tag">{{ scope.row.linkedTasks }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="Status" width="160">
-        <template #default="scope">
-          <el-tag effect="plain" :type="statusTagType(scope.row.status)">{{ scope.row.status || 'Unknown' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="editMode" label="Save" width="100">
-        <template #default="scope">
-          <el-button size="small" type="primary" :loading="scope.row.saving" @click="saveEpic(scope.row)">Save</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+        </el-table-column>
+        <el-table-column label="Linked" width="90">
+          <template #default="scope">
+            <el-button
+              v-if="scope.row.linkedTasks > 0"
+              link
+              type="success"
+              class="linked-tag"
+              @click="openLinkedTasks(scope.row)"
+            >
+              {{ scope.row.linkedTasks }}
+            </el-button>
+            <el-tag v-else effect="plain" type="info" class="linked-tag">0</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="Status" width="130">
+          <template #default="scope">
+            <el-tag effect="plain" :type="statusTagType(scope.row.status)">{{ scope.row.status || 'Unknown' }}</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-dialog v-model="editDialogVisible" title="Edit Epic" width="560px">
+      <el-form v-if="editEpic" label-position="top" @submit.prevent>
+        <el-form-item label="Epic key">
+          <el-input :model-value="editEpic.key" disabled />
+        </el-form-item>
+        <el-form-item label="Epic name">
+          <el-input v-model="editEpic.name" />
+        </el-form-item>
+        <el-form-item label="Priority">
+          <el-select v-model="editEpic.priorityTag" class="field-full">
+            <el-option label="P0" value="P0" />
+            <el-option label="P1" value="P1" />
+            <el-option label="P2" value="P2" />
+            <el-option label="P3" value="P3" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="actions">
+          <el-button @click="editDialogVisible = false">Cancel</el-button>
+          <el-button type="primary" :loading="savingEdit" @click="submitEdit">Save</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="linkedTasksDialogVisible" :title="linkedTasksDialogTitle" width="760px">
+      <el-table :data="linkedTasks" empty-text="No linked tasks">
+        <el-table-column prop="title" label="Task" min-width="260" show-overflow-tooltip />
+        <el-table-column label="Workflow" width="130">
+          <template #default="scope">
+            <el-tag effect="plain">{{ workflowLabel(scope.row.workflowDisplay) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="Trigger" min-width="130" show-overflow-tooltip>
+          <template #default="scope">
+            {{ scope.row.triggerRef || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="Action" width="90">
+          <template #default="scope">
+            <el-button link type="primary" @click="viewTask(scope.row)">Open</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </section>
 </template>

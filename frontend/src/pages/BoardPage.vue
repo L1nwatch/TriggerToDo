@@ -179,8 +179,19 @@ function openCreate() {
 }
 
 async function submitCreate() {
-  if (!createForm.title.trim() || !createForm.listId) {
+  const hasTitle = Boolean(createForm.title.trim())
+  const resolvedListId = createForm.listId || lists.value[0]?.id || ''
+  const hasList = Boolean(resolvedListId)
+  if (!hasTitle && !hasList) {
     ElMessage.warning('Title and list are required')
+    return
+  }
+  if (!hasTitle) {
+    ElMessage.warning('Title is required')
+    return
+  }
+  if (!hasList) {
+    ElMessage.warning('No task list found. Create a list first.')
     return
   }
   if (isDateTriggerRef(createForm.triggerRef) && !createForm.dueAt) {
@@ -190,7 +201,9 @@ async function submitCreate() {
 
   saving.value = true
   try {
-    await createTask(createForm.listId, taskPayloadFromForm(createForm, { includeSource: true }) as never)
+    createForm.listId = resolvedListId
+    createForm.wfStatus = 'wait-for-trigger'
+    await createTask(resolvedListId, taskPayloadFromForm(createForm, { includeSource: true }) as never)
     createDialogVisible.value = false
     await loadBoard()
     ElMessage.success('Task created')
@@ -240,6 +253,11 @@ async function onDrop(targetStatus: string) {
   const task = tasks.value.find((item) => item.id === taskId && item.listId === listId)
   draggingKey.value = ''
   if (!task) return
+  const currentStatus = normalizedStatus(task)
+  if (currentStatus === 'wait-for-trigger' && targetStatus === 'todo') {
+    ElMessage.warning('Pending Trigger tasks cannot move to To Do')
+    return
+  }
 
   try {
     await updateTaskById(task.id, {
@@ -355,7 +373,7 @@ onMounted(loadBoard)
       :model="createForm"
       :lists="lists"
       :readonly-list="false"
-      :hide-workflow-status="false"
+      :hide-workflow-status="true"
       :saving="saving"
       title="Create Task"
       save-text="Create"

@@ -159,6 +159,7 @@ body {
 
 .content {
   padding: 24px;
+  min-width: 0;
 }
 
 .page-shell {
@@ -482,6 +483,19 @@ body {
     var(--surface);
 }
 
+.epic-actions {
+  width: min(100%, 760px);
+  justify-content: flex-end;
+}
+
+.epic-actions .el-input {
+  width: min(220px, 100%);
+}
+
+.epic-actions .el-select {
+  width: 100px;
+}
+
 .epic-kpis {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -530,6 +544,18 @@ body {
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--line) 80%, #ece5d8 20%);
   box-shadow: 0 10px 24px rgba(49, 42, 31, 0.05);
+  width: 100%;
+  max-width: 100%;
+}
+
+.epic-page,
+.epic-page .settings-block,
+.epic-page .el-card,
+.epic-page .el-table,
+.epic-page .el-table__inner-wrapper,
+.epic-page .el-table__body-wrapper {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .epic-table .el-table__header-wrapper th {
@@ -543,6 +569,21 @@ body {
 .linked-tag {
   min-width: 44px;
   justify-content: center;
+}
+
+.epic-name-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.epic-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .board-col:nth-child(1) {
@@ -605,6 +646,10 @@ body {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
+}
+
+.epic-create-row {
+  grid-template-columns: minmax(160px, 220px) minmax(220px, 1fr) minmax(90px, 110px) auto;
 }
 
 .trigger-page .trigger-head {
@@ -833,8 +878,23 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .epic-create-row {
+    grid-template-columns: 1fr;
+  }
+
   .epic-kpis {
     grid-template-columns: 1fr;
+  }
+
+  .epic-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .epic-actions .el-input,
+  .epic-actions .el-select,
+  .epic-actions .el-button {
+    width: 100% !important;
   }
 
   .recurrence-inline {

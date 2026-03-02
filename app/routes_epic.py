@@ -1,3 +1,5 @@
+import re
+
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
@@ -10,6 +12,18 @@ router = APIRouter(prefix="/api/epics", tags=["epics"])
 
 def _normalize_key(value: str) -> str:
     return value.strip().upper()
+
+
+def _next_auto_key(db: Session) -> str:
+    rows = db.query(TriggerEpic.epic_key).all()
+    highest = 0
+    for (value,) in rows:
+        text = str(value or "").upper()
+        match = re.fullmatch(r"EPIC-(\d+)", text)
+        if not match:
+            continue
+        highest = max(highest, int(match.group(1)))
+    return f"EPIC-{highest + 1}"
 
 
 def _serialize(row: TriggerEpic) -> dict:
@@ -38,7 +52,8 @@ def list_epics(request: Request, db: Session = Depends(get_db)):
 @router.post("")
 def create_epic(payload: TriggerEpicCreate, request: Request, db: Session = Depends(get_db)):
     _ = request
-    key = _normalize_key(payload.epic_key)
+    requested_key = str(payload.epic_key or "").strip()
+    key = _normalize_key(requested_key) if requested_key else _next_auto_key(db)
     row = (
         db.query(TriggerEpic)
         .filter(TriggerEpic.epic_key == key)

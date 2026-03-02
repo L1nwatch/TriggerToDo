@@ -228,7 +228,7 @@ export async function listEpics() {
 }
 
 export async function createEpic(payload: {
-  epic_key: string
+  epic_key?: string
   name: string
   status?: string
   priority?: string

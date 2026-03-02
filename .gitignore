@@ -8,6 +8,7 @@ __pycache__/
 # Virtual environments
 .venv/
 venv/
+node_modules/
 
 # Test and coverage outputs
 .pytest_cache/

@@ -15,6 +15,9 @@ from app.schemas import GraphListCreate, GraphListUpdate, GraphTaskCreate, Graph
 
 router = APIRouter(prefix="/api/todo", tags=["todo"])
 
+DEFAULT_LIST_ID = "local-list-inbox"
+DEFAULT_LIST_NAME = "Inbox"
+
 
 def _utc_iso_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -214,9 +217,33 @@ def _upsert_raw_json_from_row(row: TodoTaskCache):
     row.raw_json = json.dumps(raw)
 
 
+def _ensure_default_list(db: Session) -> TodoListCache:
+    existing = (
+        db.query(TodoListCache)
+        .filter(TodoListCache.graph_list_id == DEFAULT_LIST_ID)
+        .first()
+    )
+    if existing:
+        return existing
+
+    row = TodoListCache(
+        graph_list_id=DEFAULT_LIST_ID,
+        display_name=DEFAULT_LIST_NAME,
+        is_owner=True,
+        is_shared=False,
+        etag=None,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 @router.get("/lists")
 def list_lists(request: Request, db: Session = Depends(get_db)):
     _ = request
+    if db.query(TodoListCache.id).first() is None:
+        _ensure_default_list(db)
     rows = db.query(TodoListCache).order_by(TodoListCache.display_name.asc()).all()
     return [{"id": row.graph_list_id, "displayName": row.display_name} for row in rows]
 
@@ -287,6 +314,15 @@ def list_tasks(list_id: str, request: Request, db: Session = Depends(get_db)):
 @router.post("/lists/{list_id}/tasks")
 def create_task(list_id: str, payload: GraphTaskCreate, request: Request, db: Session = Depends(get_db)):
     _ = request
+    list_row = (
+        db.query(TodoListCache)
+        .filter(TodoListCache.graph_list_id == list_id)
+        .first()
+    )
+    if not list_row:
+        fallback = _ensure_default_list(db)
+        list_id = fallback.graph_list_id
+
     task_id = f"local-task-{uuid4().hex}"
 
     body = payload.body or {}

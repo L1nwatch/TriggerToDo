@@ -187,8 +187,19 @@ function openEdit(task: TodoTask) {
 }
 
 async function submitCreate() {
-  if (!createForm.title.trim() || !createForm.listId) {
+  const hasTitle = Boolean(createForm.title.trim())
+  const resolvedListId = createForm.listId || lists.value[0]?.id || ''
+  const hasList = Boolean(resolvedListId)
+  if (!hasTitle && !hasList) {
     ElMessage.warning('Title and list are required')
+    return
+  }
+  if (!hasTitle) {
+    ElMessage.warning('Title is required')
+    return
+  }
+  if (!hasList) {
+    ElMessage.warning('No task list found. Create a list first.')
     return
   }
   if (isDateTriggerRef(createForm.triggerRef) && !createForm.dueAt) {
@@ -198,7 +209,8 @@ async function submitCreate() {
 
   saving.value = true
   try {
-    await createTask(createForm.listId, taskPayloadFromForm(createForm, { includeSource: true }) as never)
+    createForm.listId = resolvedListId
+    await createTask(resolvedListId, taskPayloadFromForm(createForm, { includeSource: true }) as never)
     createDialogVisible.value = false
     await loadData()
     ElMessage.success('Task created')

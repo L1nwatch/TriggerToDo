@@ -77,7 +77,7 @@ class TriggerEventUpdate(BaseModel):
 
 
 class TriggerEpicCreate(BaseModel):
-    epic_key: str
+    epic_key: Optional[str] = None
     name: str
     status: Optional[str] = None
     priority: Optional[str] = None
