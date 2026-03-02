@@ -37,7 +37,6 @@ const newEpic = ref<{
   priorityTag: 'P2',
 })
 const linkedTasksDialogVisible = ref(false)
-const linkedTasksDialogTitle = ref('')
 const linkedTasks = ref<
   Array<{
     taskId: string
@@ -238,13 +237,18 @@ async function loadEpics() {
 function openLinkedTasks(row: EpicRow) {
   const epicKey = String(row.key || '').trim().toUpperCase()
   linkedTasks.value = tasksByEpicKey.value.get(epicKey) || []
-  linkedTasksDialogTitle.value = `${row.key} Linked Tasks`
   linkedTasksDialogVisible.value = true
 }
 
 function viewTask(task: { listId: string; taskId: string }) {
   linkedTasksDialogVisible.value = false
-  router.push(`/tasks/${encodeURIComponent(task.listId)}/${encodeURIComponent(task.taskId)}`)
+  router.push({
+    name: 'task-detail',
+    params: {
+      listId: task.listId,
+      taskId: task.taskId,
+    },
+  })
 }
 
 function openEdit(row: EpicRow) {
@@ -268,7 +272,7 @@ async function submitEdit() {
   savingEdit.value = true
   try {
     await updateEpic(editEpic.value.id, { name, priority: editEpic.value.priorityTag })
-    ElMessage.success(`Updated ${editEpic.value.key}`)
+    ElMessage.success('Epic updated')
     editDialogVisible.value = false
     editEpic.value = null
     await loadEpics()
@@ -405,9 +409,6 @@ onMounted(loadEpics)
 
     <el-dialog v-model="editDialogVisible" title="Edit Epic" width="560px">
       <el-form v-if="editEpic" label-position="top" @submit.prevent>
-        <el-form-item label="Epic key">
-          <el-input :model-value="editEpic.key" disabled />
-        </el-form-item>
         <el-form-item label="Epic name">
           <el-input v-model="editEpic.name" />
         </el-form-item>
@@ -428,7 +429,7 @@ onMounted(loadEpics)
       </template>
     </el-dialog>
 
-    <el-dialog v-model="linkedTasksDialogVisible" :title="linkedTasksDialogTitle" width="760px">
+    <el-dialog v-model="linkedTasksDialogVisible" title="Linked Tasks" width="760px">
       <el-table :data="linkedTasks" empty-text="No linked tasks">
         <el-table-column prop="title" label="Task" min-width="260" show-overflow-tooltip />
         <el-table-column label="Workflow" width="130">

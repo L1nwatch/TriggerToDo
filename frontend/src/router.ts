@@ -1,7 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+const inferredBase =
+  typeof window !== 'undefined' && window.location.pathname.startsWith('/static/todo/')
+    ? '/static/todo/'
+    : import.meta.env.BASE_URL
+
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(inferredBase),
   routes: [
     { path: '/', redirect: '/board/triggered' },
     { path: '/today', redirect: '/board/triggered' },

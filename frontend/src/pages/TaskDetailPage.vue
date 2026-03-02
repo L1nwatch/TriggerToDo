@@ -38,7 +38,7 @@ async function loadTask() {
     triggerEvents.value = eventsData.items
     epicOptions.value = epicsData.items.map((epic) => ({
       value: epic.epic_key,
-      label: epic.name || epic.epic_key,
+      label: epic.name || 'Unnamed Epic',
     }))
     if (!task) {
       ElMessage.error('Task not found')

@@ -115,7 +115,7 @@ async function loadEpicPriorities() {
     const map = new Map<string, 'P0' | 'P1' | 'P2' | 'P3'>()
     epicOptions.value = response.items.map((epic) => ({
       value: epic.epic_key,
-      label: epic.name || epic.epic_key,
+      label: epic.name || 'Unnamed Epic',
     }))
     for (const epic of response.items || []) {
       const fromSummary = extractPriorityFromSummary(epic.name)
