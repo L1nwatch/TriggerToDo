@@ -95,6 +95,12 @@ function priorityRank(task: TodoTask) {
   return 9
 }
 
+function toTimeMs(value?: string | null) {
+  if (!value) return null
+  const ms = Date.parse(value)
+  return Number.isNaN(ms) ? null : ms
+}
+
 function triggerLabel(task: TodoTask) {
   return triggerDisplay(task, new Map(triggerEvents.value.map((event) => [event.id, event])))
 }
@@ -129,6 +135,14 @@ const waitingTasks = computed(() =>
   tasks.value
     .filter((task) => displayPool(task) === 'waiting-trigger')
     .sort((a, b) => {
+      const aCreatedMs = toTimeMs(a.createdDateTime)
+      const bCreatedMs = toTimeMs(b.createdDateTime)
+      if (aCreatedMs !== null && bCreatedMs !== null && aCreatedMs !== bCreatedMs) {
+        return bCreatedMs - aCreatedMs
+      }
+      if (aCreatedMs !== null && bCreatedMs === null) return -1
+      if (aCreatedMs === null && bCreatedMs !== null) return 1
+
       const rankDiff = priorityRank(a) - priorityRank(b)
       if (rankDiff !== 0) return rankDiff
       return a.title.localeCompare(b.title)
