@@ -558,8 +558,25 @@ body {
   background: linear-gradient(180deg, #f8f3e8 0%, #f4ede0 100%);
 }
 
+.epic-table .el-table__row {
+  cursor: pointer;
+}
+
 .epic-table .el-table__row:hover > td {
   background: #fffaf0 !important;
+}
+
+.epic-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.epic-table-header span {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .linked-tag {
@@ -575,11 +592,97 @@ body {
   min-width: 0;
 }
 
+.epic-name-stack {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
 .epic-name-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.epic-key-text {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.epic-name-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.epic-detail {
+  padding: 8px 4px 4px;
+}
+
+.epic-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  color: #5a513f;
+  font-size: 13px;
+}
+
+.epic-task-list {
+  display: grid;
+  gap: 10px;
+}
+
+.epic-task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 74%, #ece5d8 26%);
+  background: linear-gradient(180deg, rgba(255, 252, 245, 0.98) 0%, rgba(250, 246, 237, 0.92) 100%);
+}
+
+.epic-task-link {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-start;
+  width: auto;
+  max-width: none;
+  padding: 0;
+  font-weight: 600;
+  text-align: left;
+  color: #1f5f96;
+}
+
+.epic-task-link .el-button__text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.epic-task-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.epic-task-trigger,
+.epic-task-due {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 @media (max-width: 900px) {
@@ -590,6 +693,18 @@ body {
 
   .epic-name-text {
     flex: 1;
+  }
+
+  .epic-task-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .epic-task-meta {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    white-space: normal;
   }
 }
 
