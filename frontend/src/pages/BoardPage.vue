@@ -332,12 +332,12 @@ onMounted(loadBoard)
         class="task-card task-row task-row-clickable waiting-card"
         @click="openEdit(task)"
       >
-        <div class="task-main">
+        <div class="task-main task-main-single">
           <h3 class="task-title-inline">{{ task.title }}</h3>
-          <div class="kanban-meta waiting-meta">
-            <span class="meta-chip">Source: {{ task.source }}</span>
-            <span v-if="priorityLabel(task) !== 'Unknown'" class="meta-chip">Priority: {{ priorityLabel(task) }}</span>
-            <span class="meta-chip">Trigger: {{ triggerLabel(task) }}</span>
+          <div class="task-inline-meta task-inline-meta-single">
+            <el-tag size="small" effect="plain" type="info">{{ task.source }}</el-tag>
+            <span v-if="priorityLabel(task) !== 'Unknown'">Priority: {{ priorityLabel(task) }}</span>
+            <span>Trigger: {{ triggerLabel(task) }}</span>
           </div>
         </div>
         <div class="task-actions task-actions-inline">

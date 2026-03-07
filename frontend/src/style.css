@@ -464,13 +464,9 @@ body {
 }
 
 .waiting-card .task-title-inline {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: unset;
-}
-
-.waiting-meta {
-  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .epic-page .page-head {
@@ -717,6 +713,90 @@ body {
   border-bottom: 1px solid var(--line);
 }
 
+.trigger-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.trigger-table-header span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.trigger-table-wrap .el-table__row {
+  cursor: pointer;
+}
+
+.trigger-detail {
+  padding: 8px 4px 4px;
+}
+
+.trigger-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  color: #5a513f;
+  font-size: 13px;
+}
+
+.trigger-task-list {
+  display: grid;
+  gap: 10px;
+}
+
+.trigger-task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 74%, #ece5d8 26%);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 245, 0.98) 0%, rgba(250, 246, 237, 0.92) 100%);
+}
+
+.trigger-task-link {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-start;
+  width: auto;
+  max-width: none;
+  padding: 0;
+  font-weight: 600;
+  text-align: left;
+  color: #1f5f96;
+}
+
+.trigger-task-link .el-button__text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trigger-task-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.trigger-task-due {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .end-col {
   display: flex;
   align-items: end;
@@ -958,6 +1038,21 @@ body {
   .settings-block .el-table .cell {
     white-space: normal;
     word-break: break-word;
+  }
+
+  .trigger-task-item {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .trigger-task-link {
+    flex-basis: 100%;
+  }
+
+  .trigger-task-meta {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    white-space: normal;
   }
 
   .el-dialog {
