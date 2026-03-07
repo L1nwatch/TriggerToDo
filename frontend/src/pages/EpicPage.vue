@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { createEpic, listEpics, listTriggerEvents, queryCachedTasks, updateEpic } from '../lib/api'
+import TaskEditDialog from '../components/TaskEditDialog.vue'
+import { createEpic, listEpics, listTodoLists, listTriggerEvents, queryCachedTasks, updateEpic, updateTask } from '../lib/api'
+import { builtInTriggerOptions, isDateTriggerRef } from '../lib/triggerCatalog'
+import { defaultTaskForm, formFromTask, taskPayloadFromForm, type TaskFormModel } from '../lib/taskForm'
 import { hasAnyTriggerConfigured, isTaskTriggered } from '../lib/triggerSignal'
-import type { TodoTask, TriggerEvent } from '../lib/types'
+import type { TodoList, TodoTask, TriggerEvent } from '../lib/types'
 
 type RelatedEpicTask = {
   taskId: string
@@ -18,6 +20,7 @@ type RelatedEpicTask = {
   triggerRef?: string
   triggerDisplay: string
   triggered: boolean
+  task: TodoTask
 }
 
 type EpicRow = {
@@ -33,14 +36,22 @@ type EpicRow = {
 }
 
 const loading = ref(false)
-const router = useRouter()
 const editMode = ref(false)
 const rows = ref<EpicRow[]>([])
 const creating = ref(false)
 const editDialogVisible = ref(false)
 const savingEdit = ref(false)
+const savingTask = ref(false)
+const triggerLoading = ref(false)
+const epicLoading = ref(false)
 const isMobile = ref(false)
 const expandedEpicKeys = ref<string[]>([])
+const events = ref<TriggerEvent[]>([])
+const lists = ref<TodoList[]>([])
+const epicOptions = ref<Array<{ value: string; label: string }>>([])
+const taskDialogVisible = ref(false)
+const editingTask = ref<TodoTask | null>(null)
+const taskForm = ref<TaskFormModel>(defaultTaskForm(''))
 let mobileMediaQuery: MediaQueryList | null = null
 const editEpic = ref<{
   id: number
@@ -119,6 +130,51 @@ function triggerLabel(ref: string | undefined, eventsById: Map<number, TriggerEv
   if (lower === 'date') return 'Date Trigger'
   if (lower.startsWith('date:')) return `Date Trigger (${lower.slice('date:'.length)})`
   return value
+}
+
+function cacheItemToTask(item: {
+  listId: string
+  taskId: string
+  title: string
+  status?: string
+  importance?: string
+  bodyContent?: string
+  dueDateTime?: string
+  dueTimeZone?: string
+  recurrenceJson?: string
+  pool?: string
+  wfStatus?: string
+  triggerRef?: string
+  epicKey?: string
+  createdDateTime?: string
+  lastModifiedDateTime?: string
+  source?: 'microsoft-todo' | 'jira' | 'triggertodo'
+}): TodoTask {
+  return {
+    id: item.taskId,
+    listId: item.listId,
+    title: item.title,
+    status: item.status,
+    importance: item.importance,
+    source: item.source || 'microsoft-todo',
+    createdDateTime: item.createdDateTime || null,
+    lastModifiedDateTime: item.lastModifiedDateTime || null,
+    body: { contentType: 'text', content: item.bodyContent || '' },
+    dueDateTime: item.dueDateTime ? { dateTime: item.dueDateTime, timeZone: item.dueTimeZone || 'UTC' } : null,
+    recurrence: item.recurrenceJson
+      ? (JSON.parse(item.recurrenceJson) as { pattern: Record<string, unknown>; range: Record<string, unknown> })
+      : null,
+    extensions: [
+      {
+        extensionName: 'com.triggertodo.meta',
+        pool: item.pool || null,
+        wfStatus: item.wfStatus || null,
+        triggerRef: item.triggerRef || null,
+        epicKey: item.epicKey || null,
+        source: item.source || 'microsoft-todo',
+      },
+    ],
+  }
 }
 
 function toSignalTask(item: {
@@ -248,8 +304,21 @@ function sortRelatedTasks(tasks: RelatedEpicTask[]) {
 async function loadEpics() {
   loading.value = true
   try {
-    const [epicsData, tasksData, eventsData] = await Promise.all([listEpics(), queryCachedTasks(), listTriggerEvents()])
-    const eventsById = new Map<number, TriggerEvent>(eventsData.items.map((event) => [event.id, event]))
+    triggerLoading.value = true
+    epicLoading.value = true
+    const [epicsData, tasksData, eventsData, listsData] = await Promise.all([
+      listEpics(),
+      queryCachedTasks(),
+      listTriggerEvents(),
+      listTodoLists(),
+    ])
+    events.value = eventsData.items
+    lists.value = listsData
+    epicOptions.value = epicsData.items.map((epic) => ({
+      value: epic.epic_key,
+      label: epic.name || 'Unnamed Epic',
+    }))
+    const eventsById = new Map<number, TriggerEvent>(events.value.map((event) => [event.id, event]))
     const taskMap = new Map<string, RelatedEpicTask[]>()
 
     for (const task of tasksData.items) {
@@ -258,6 +327,7 @@ async function loadEpics() {
       if (!epicKey) continue
       const tasks = taskMap.get(epicKey) || []
       const signalState = taskSignalState(task, eventsById)
+      const todoTask = cacheItemToTask(task)
       tasks.push({
         taskId: task.taskId,
         listId: task.listId,
@@ -270,6 +340,7 @@ async function loadEpics() {
         triggerRef: task.triggerRef,
         triggerDisplay: triggerLabel(task.triggerRef, eventsById),
         triggered: signalState.triggered,
+        task: todoTask,
       })
       taskMap.set(epicKey, tasks)
     }
@@ -300,6 +371,8 @@ async function loadEpics() {
   } catch (error) {
     ElMessage.error((error as Error).message || 'Failed to load epics')
   } finally {
+    triggerLoading.value = false
+    epicLoading.value = false
     loading.value = false
   }
 }
@@ -316,14 +389,34 @@ function syncExpandedRows(_: EpicRow, expandedRows: EpicRow[]) {
   expandedEpicKeys.value = expandedRows.map((item) => item.key)
 }
 
-function viewTask(task: { listId: string; taskId: string }) {
-  router.push({
-    name: 'task-detail',
-    params: {
-      listId: task.listId,
-      taskId: task.taskId,
-    },
-  })
+function openTask(task: TodoTask) {
+  editingTask.value = task
+  taskForm.value = formFromTask(task)
+  taskDialogVisible.value = true
+}
+
+async function submitTaskEdit() {
+  if (!editingTask.value) return
+  if (!taskForm.value.title.trim()) {
+    ElMessage.warning('Title is required')
+    return
+  }
+  if (isDateTriggerRef(taskForm.value.triggerRef) && !taskForm.value.dueAt) {
+    ElMessage.warning('Date trigger requires due date')
+    return
+  }
+
+  savingTask.value = true
+  try {
+    await updateTask(editingTask.value.listId, editingTask.value.id, taskPayloadFromForm(taskForm.value))
+    taskDialogVisible.value = false
+    await loadEpics()
+    ElMessage.success('Task updated')
+  } catch (error) {
+    ElMessage.error((error as Error).message || 'Failed to update task')
+  } finally {
+    savingTask.value = false
+  }
 }
 
 function openEdit(row: EpicRow) {
@@ -482,7 +575,7 @@ onBeforeUnmount(() => {
               </div>
               <div v-if="scope.row.relatedTasks.length" class="epic-task-list">
                 <article v-for="task in scope.row.relatedTasks" :key="task.taskId" class="epic-task-item">
-                  <el-button link class="epic-task-link" @click.stop="viewTask(task)">
+                  <el-button link class="epic-task-link" @click.stop="openTask(task.task)">
                     {{ task.title }}
                   </el-button>
                   <div class="epic-task-meta">
@@ -553,6 +646,23 @@ onBeforeUnmount(() => {
         </div>
       </template>
     </el-dialog>
+
+    <TaskEditDialog
+      v-model="taskDialogVisible"
+      :model="taskForm"
+      :lists="lists"
+      :readonly-list="true"
+      :hide-workflow-status="true"
+      :saving="savingTask"
+      :trigger-options="[
+        ...builtInTriggerOptions(),
+        ...events.map((event) => ({ value: `event:${event.id}`, label: `event-trigger: ${event.name}${event.is_active ? ' (occurred)' : ''}` })),
+      ]"
+      :trigger-loading="triggerLoading"
+      :epic-options="epicOptions"
+      :epic-loading="epicLoading"
+      @save="submitTaskEdit"
+    />
 
   </section>
 </template>
