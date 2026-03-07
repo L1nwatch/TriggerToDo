@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import TaskEditDialog from '../components/TaskEditDialog.vue'
 import { listEpics, listTodoLists, listTriggerEvents, queryCachedTasks, updateTask } from '../lib/api'
@@ -21,6 +21,7 @@ const expandedTriggerKeys = ref<string[]>([])
 const editDialogVisible = ref(false)
 const editingTask = ref<TodoTask | null>(null)
 const editForm = ref<TaskFormModel>(defaultTaskForm(''))
+const triggerTypeFilter = ref<'all' | 'date-trigger' | 'event-trigger'>('all')
 
 function cacheItemToTask(item: {
   listId: string
@@ -165,15 +166,29 @@ const triggerRows = computed(() => {
   return rows.sort((a, b) => b.totalTasks - a.totalTasks || a.name.localeCompare(b.name))
 })
 
+const filteredTriggerRows = computed(() => {
+  if (triggerTypeFilter.value === 'all') return triggerRows.value
+  return triggerRows.value.filter((row) => row.type === triggerTypeFilter.value)
+})
+
 const overview = computed(() => ({
-  totalTriggers: DATE_TRIGGER_REFS.length + events.value.length,
-  dateTriggers: DATE_TRIGGER_REFS.length,
-  eventTriggers: events.value.length,
-  activeEvents: events.value.filter((event) => event.is_active).length,
-  totalAssignedTasks: triggerRows.value.reduce((acc, row) => acc + row.totalTasks, 0),
-  totalTriggeredTasks: triggerRows.value.reduce((acc, row) => acc + row.triggeredTasks, 0),
-  totalWaitingTasks: triggerRows.value.reduce((acc, row) => acc + row.waitingTasks, 0),
+  totalTriggers: filteredTriggerRows.value.length,
+  dateTriggers: filteredTriggerRows.value.filter((row) => row.type === 'date-trigger').length,
+  eventTriggers: filteredTriggerRows.value.filter((row) => row.type === 'event-trigger').length,
+  activeEvents: filteredTriggerRows.value.filter((row) => row.type === 'event-trigger' && row.state === 'occurred').length,
+  totalAssignedTasks: filteredTriggerRows.value.reduce((acc, row) => acc + row.totalTasks, 0),
+  totalTriggeredTasks: filteredTriggerRows.value.reduce((acc, row) => acc + row.triggeredTasks, 0),
+  totalWaitingTasks: filteredTriggerRows.value.reduce((acc, row) => acc + row.waitingTasks, 0),
 }))
+
+watch(
+  filteredTriggerRows,
+  (rows) => {
+    const visibleKeys = new Set(rows.map((row) => row.key))
+    expandedTriggerKeys.value = expandedTriggerKeys.value.filter((key) => visibleKeys.has(key))
+  },
+  { immediate: true },
+)
 
 function typeTagType(type: string) {
   if (type === 'date-trigger') return 'success'
@@ -199,6 +214,11 @@ function taskStatusTagType(status?: string) {
   return 'info'
 }
 
+function shouldShowStatus(status?: string) {
+  const value = String(status || '').trim().toLowerCase()
+  return Boolean(value) && value !== 'notstarted'
+}
+
 function statusLabel(status?: string) {
   return String(status || 'open').trim() || 'open'
 }
@@ -210,9 +230,9 @@ function formatDateTime(value?: string | null) {
 }
 
 function formatDue(value?: string | null) {
-  if (!value) return 'No due date'
+  if (!value) return ''
   const at = new Date(value)
-  return Number.isNaN(at.getTime()) ? 'No due date' : at.toLocaleString()
+  return Number.isNaN(at.getTime()) ? '' : at.toLocaleString()
 }
 
 function toggleTriggerRow(row: TriggerRow) {
@@ -293,12 +313,19 @@ onMounted(loadData)
         <h1>Trigger Management</h1>
         <p>Overview of date-trigger and event-trigger status across your tasks</p>
       </div>
+      <div class="actions">
+        <el-select v-model="triggerTypeFilter" placeholder="Filter trigger type" style="width: 180px">
+          <el-option label="All triggers" value="all" />
+          <el-option label="Date-trigger" value="date-trigger" />
+          <el-option label="Event-trigger" value="event-trigger" />
+        </el-select>
+      </div>
     </header>
 
     <el-row :gutter="12" class="monitor-cards trigger-kpis">
       <el-col :xs="12" :md="6">
         <el-card class="kpi-card kpi-a">
-          <p class="metric-label">Total Triggers</p>
+          <p class="metric-label">Visible Triggers</p>
           <p class="metric-value">{{ overview.totalTriggers }}</p>
         </el-card>
       </el-col>
@@ -343,8 +370,8 @@ onMounted(loadData)
       </el-col>
       <el-col :xs="12" :md="6">
         <el-card class="kpi-card">
-          <p class="metric-label">Events</p>
-          <p class="metric-value">{{ events.length }}</p>
+          <p class="metric-label">Shown Rows</p>
+          <p class="metric-value">{{ filteredTriggerRows.length }}</p>
         </el-card>
       </el-col>
     </el-row>
@@ -353,14 +380,14 @@ onMounted(loadData)
       <template #header>
         <div class="trigger-table-header">
           <strong>Trigger status by trigger</strong>
-          <span>Click a trigger row to expand its related tasks.</span>
+          <span>Click a trigger row to expand its related tasks. Use the filter to show one trigger type.</span>
         </div>
       </template>
       <el-table
-        :data="triggerRows"
+        :data="filteredTriggerRows"
         row-key="key"
         :expand-row-keys="expandedTriggerKeys"
-        empty-text="No triggers yet"
+        :empty-text="triggerTypeFilter === 'all' ? 'No triggers yet' : 'No triggers match this filter'"
         @row-click="toggleTriggerRow"
         @expand-change="syncExpandedRows"
       >
@@ -380,13 +407,13 @@ onMounted(loadData)
                     <el-tag size="small" effect="light" :type="taskStateTagType(task.triggered)">
                       {{ task.triggered ? 'triggered' : 'waiting' }}
                     </el-tag>
-                    <el-tag size="small" effect="plain" :type="taskStatusTagType(task.status)">
+                    <el-tag v-if="shouldShowStatus(task.status)" size="small" effect="plain" :type="taskStatusTagType(task.status)">
                       {{ statusLabel(task.status) }}
                     </el-tag>
                     <el-tag v-if="task.importance === 'high'" size="small" effect="plain" type="danger">
                       high priority
                     </el-tag>
-                    <span class="trigger-task-due">{{ formatDue(task.dueDateTime?.dateTime) }}</span>
+                    <span v-if="formatDue(task.dueDateTime?.dateTime)" class="trigger-task-due">{{ formatDue(task.dueDateTime?.dateTime) }}</span>
                   </div>
                 </article>
               </div>

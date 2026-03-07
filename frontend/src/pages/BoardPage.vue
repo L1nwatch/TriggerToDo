@@ -26,6 +26,7 @@ const editingTask = ref<TodoTask | null>(null)
 const editForm = reactive<TaskFormModel>(defaultTaskForm(''))
 const createDialogVisible = ref(false)
 const createForm = reactive<TaskFormModel>(defaultTaskForm(''))
+const triggerTypeFilter = ref<'all' | 'event-trigger' | 'date-trigger' | 'other-trigger'>('all')
 
 const statuses = computed(() =>
   selectedPool.value === 'waiting-trigger'
@@ -110,11 +111,26 @@ function isCompletedStatus(status?: string) {
   return value.includes('done') || value.includes('closed') || value.includes('resolved') || value.includes('complete')
 }
 
+function configuredTriggerType(task: TodoTask) {
+  const ref = String(extension(task)?.triggerRef || '').trim().toLowerCase()
+  if (ref.startsWith('event:')) return 'event-trigger'
+  if (isDateTriggerRef(ref) || task.dueDateTime?.dateTime || task.recurrence?.pattern) return 'date-trigger'
+  if (ref) return 'other-trigger'
+  return 'none'
+}
+
+function matchesTriggerTypeFilter(task: TodoTask) {
+  if (selectedPool.value !== 'triggered') return true
+  if (triggerTypeFilter.value === 'all') return true
+  return configuredTriggerType(task) === triggerTypeFilter.value
+}
+
 const indexed = computed(() => {
   const map = new Map<string, TodoTask[]>()
   for (const wfStatus of statuses.value) {
     const rows = tasks.value.filter((task) => {
       if (displayPool(task) !== selectedPool.value) return false
+      if (!matchesTriggerTypeFilter(task)) return false
       if (normalizedStatus(task) !== wfStatus) return false
       return true
     })
@@ -133,7 +149,7 @@ const indexed = computed(() => {
 
 const waitingTasks = computed(() =>
   tasks.value
-    .filter((task) => displayPool(task) === 'waiting-trigger')
+    .filter((task) => displayPool(task) === 'waiting-trigger' && matchesTriggerTypeFilter(task))
     .sort((a, b) => {
       const aCreatedMs = toTimeMs(a.createdDateTime)
       const bCreatedMs = toTimeMs(b.createdDateTime)
@@ -320,7 +336,20 @@ onMounted(loadBoard)
           }}
         </p>
       </div>
-      <el-button v-if="selectedPool === 'waiting-trigger'" type="primary" @click="openCreate">Create Task</el-button>
+      <div class="actions">
+        <el-select
+          v-if="selectedPool === 'triggered'"
+          v-model="triggerTypeFilter"
+          placeholder="Filter trigger type"
+          style="width: 190px"
+        >
+          <el-option label="All triggers" value="all" />
+          <el-option label="Event-triggered" value="event-trigger" />
+          <el-option label="Date-triggered" value="date-trigger" />
+          <el-option label="Other triggers" value="other-trigger" />
+        </el-select>
+        <el-button v-if="selectedPool === 'waiting-trigger'" type="primary" @click="openCreate">Create Task</el-button>
+      </div>
     </header>
 
     <el-skeleton :loading="loading" animated :rows="6" v-if="loading" />

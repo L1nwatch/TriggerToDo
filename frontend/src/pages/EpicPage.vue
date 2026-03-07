@@ -231,14 +231,19 @@ function taskStatusTagType(status?: string) {
   return 'info'
 }
 
+function shouldShowStatus(status?: string) {
+  const value = String(status || '').trim().toLowerCase()
+  return Boolean(value) && value !== 'notstarted'
+}
+
 function statusLabel(status?: string) {
   return String(status || 'open').trim() || 'open'
 }
 
 function formatDue(value?: string | null) {
-  if (!value) return 'No due date'
+  if (!value) return ''
   const at = new Date(value)
-  return Number.isNaN(at.getTime()) ? 'No due date' : at.toLocaleString()
+  return Number.isNaN(at.getTime()) ? '' : at.toLocaleString()
 }
 
 function dueAt(task: RelatedEpicTask): number {
@@ -322,7 +327,7 @@ async function loadEpics() {
     const taskMap = new Map<string, RelatedEpicTask[]>()
 
     for (const task of tasksData.items) {
-      if (String(task.status || '').toLowerCase() === 'completed') continue
+      if (isCompletedStatus(task.status)) continue
       const epicKey = String(task.epicKey || '').trim().toUpperCase()
       if (!epicKey) continue
       const tasks = taskMap.get(epicKey) || []
@@ -585,14 +590,14 @@ onBeforeUnmount(() => {
                     <el-tag size="small" effect="plain" :type="workflowTagType(task.workflowDisplay)">
                       {{ workflowLabel(task.workflowDisplay) }}
                     </el-tag>
-                    <el-tag size="small" effect="plain" :type="taskStatusTagType(task.status)">
+                    <el-tag v-if="shouldShowStatus(task.status)" size="small" effect="plain" :type="taskStatusTagType(task.status)">
                       {{ statusLabel(task.status) }}
                     </el-tag>
                     <el-tag v-if="task.importance === 'high'" size="small" effect="plain" type="danger">
                       high priority
                     </el-tag>
                     <span class="epic-task-trigger">{{ task.triggerDisplay }}</span>
-                    <span class="epic-task-due">{{ formatDue(task.dueDateTime) }}</span>
+                    <span v-if="formatDue(task.dueDateTime)" class="epic-task-due">{{ formatDue(task.dueDateTime) }}</span>
                   </div>
                 </article>
               </div>
