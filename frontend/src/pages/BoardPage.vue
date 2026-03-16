@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import TaskEditDialog from '../components/TaskEditDialog.vue'
-import { completeTask, createTask, fetchAllTasks, listEpics, listTriggerEvents, updateTask, updateTaskById } from '../lib/api'
+import { completeTask, createTask, fetchAllTasks, listEpics, listTriggerEvents, updateTask } from '../lib/api'
 import { BOARD_CUTOFF_ISO, isOnOrAfterBoardCutoff } from '../lib/boardCutoff'
 import { builtInTriggerOptions, isDateTriggerRef } from '../lib/triggerCatalog'
 import { hasAnyTriggerConfigured, isTaskTriggered, triggerDisplay } from '../lib/triggerSignal'
@@ -20,7 +20,7 @@ const epicOptions = ref<Array<{ value: string; label: string }>>([])
 const epicPriorityByKey = ref(new Map<string, 'P0' | 'P1' | 'P2' | 'P3'>())
 const triggerLoading = ref(false)
 const epicLoading = ref(false)
-const draggingKey = ref('')
+const draggingTaskRef = ref<{ listId: string; taskId: string } | null>(null)
 const editDialogVisible = ref(false)
 const editingTask = ref<TodoTask | null>(null)
 const editForm = reactive<TaskFormModel>(defaultTaskForm(''))
@@ -245,7 +245,7 @@ async function submitCreate() {
 }
 
 function onDragStart(task: TodoTask) {
-  draggingKey.value = `${task.listId}:${task.id}`
+  draggingTaskRef.value = { listId: task.listId, taskId: task.id }
 }
 
 function openEdit(task: TodoTask) {
@@ -278,10 +278,10 @@ async function submitEdit() {
 }
 
 async function onDrop(targetStatus: string) {
-  if (!draggingKey.value) return
-  const [listId, taskId] = draggingKey.value.split(':')
+  if (!draggingTaskRef.value) return
+  const { listId, taskId } = draggingTaskRef.value
   const task = tasks.value.find((item) => item.id === taskId && item.listId === listId)
-  draggingKey.value = ''
+  draggingTaskRef.value = null
   if (!task) return
   const currentStatus = normalizedStatus(task)
   if (currentStatus === 'wait-for-trigger' && targetStatus === 'todo') {
@@ -290,7 +290,7 @@ async function onDrop(targetStatus: string) {
   }
 
   try {
-    await updateTaskById(task.id, {
+    await updateTask(task.listId, task.id, {
       extensions: {
         wfStatus: targetStatus,
       },
