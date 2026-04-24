@@ -497,7 +497,7 @@ body {
 
 .epic-kpis {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -536,6 +536,14 @@ body {
 
 .epic-kpi-linked .metric-value {
   color: #1f7a56;
+}
+
+.epic-kpi-done {
+  background: linear-gradient(140deg, #eef6ed 0%, #fbfdf8 100%);
+}
+
+.epic-kpi-done .metric-value {
+  color: #4f7d35;
 }
 
 .epic-table {

@@ -28,6 +28,7 @@ type EpicRow = {
   key: string
   name: string
   status?: string
+  done: boolean
   priorityTag: 'P0' | 'P1' | 'P2' | 'P3'
   linkedTasks: number
   triggeredTasks: number
@@ -96,9 +97,12 @@ function priorityTagType(priorityTag: 'P0' | 'P1' | 'P2' | 'P3') {
   return 'info'
 }
 
-const total = computed(() => rows.value.length)
-const highPriorityCount = computed(() => rows.value.filter((row) => row.priorityTag === 'P0' || row.priorityTag === 'P1').length)
-const linkedTaskTotal = computed(() => rows.value.reduce((sum, row) => sum + row.linkedTasks, 0))
+const activeRows = computed(() => rows.value.filter((row) => !row.done))
+const doneRows = computed(() => rows.value.filter((row) => row.done))
+const total = computed(() => activeRows.value.length)
+const doneTotal = computed(() => doneRows.value.length)
+const highPriorityCount = computed(() => activeRows.value.filter((row) => row.priorityTag === 'P0' || row.priorityTag === 'P1').length)
+const linkedTaskTotal = computed(() => activeRows.value.reduce((sum, row) => sum + row.linkedTasks, 0))
 const editDialogWidth = computed(() => (isMobile.value ? '92vw' : '560px'))
 
 function normalizeWorkflowStatus(raw?: string): string {
@@ -351,7 +355,6 @@ async function loadEpics() {
     }
 
     rows.value = epicsData.items
-      .filter((item) => !isCompletedStatus(item.status))
       .map((item) => {
         const relatedTasks = sortRelatedTasks(taskMap.get(String(item.epic_key || '').toUpperCase()) || [])
         const triggeredTasks = relatedTasks.filter((task) => task.triggered).length
@@ -360,6 +363,7 @@ async function loadEpics() {
           key: item.epic_key,
           name: item.name,
           status: item.status,
+          done: isCompletedStatus(item.status),
           priorityTag: normalizePriorityTag(item.priority),
           linkedTasks: relatedTasks.length,
           triggeredTasks,
@@ -456,6 +460,16 @@ async function submitEdit() {
   }
 }
 
+async function setEpicDone(row: EpicRow, done: boolean) {
+  try {
+    await updateEpic(row.id, { status: done ? 'Done' : 'Open' })
+    ElMessage.success(done ? 'Epic marked done' : 'Epic restored')
+    await loadEpics()
+  } catch (error) {
+    ElMessage.error((error as Error).message || 'Failed to update epic')
+  }
+}
+
 async function submitNewEpic() {
   if (!editMode.value) {
     ElMessage.warning('Enable Edit Mode to add epics')
@@ -531,6 +545,10 @@ onBeforeUnmount(() => {
         <p class="metric-label">Linked Tasks</p>
         <p class="metric-value">{{ linkedTaskTotal }}</p>
       </article>
+      <article class="epic-kpi-card epic-kpi-done">
+        <p class="metric-label">Done Epics</p>
+        <p class="metric-value">{{ doneTotal }}</p>
+      </article>
     </section>
 
     <el-card v-if="editMode">
@@ -563,10 +581,10 @@ onBeforeUnmount(() => {
         </div>
       </template>
       <el-table
-        :data="rows"
+        :data="activeRows"
         row-key="key"
         :expand-row-keys="expandedEpicKeys"
-        empty-text="No epics found"
+        empty-text="No active epics found"
         class="epic-table"
         @row-click="toggleEpicRow"
         @expand-change="syncExpandedRows"
@@ -615,6 +633,84 @@ onBeforeUnmount(() => {
               <div class="epic-name-actions">
                 <el-tag v-if="isMobile" size="small" effect="dark" :type="priorityTagType(scope.row.priorityTag)">{{ scope.row.priorityTag }}</el-tag>
                 <el-button v-if="editMode" size="small" type="primary" @click.stop="openEdit(scope.row)">Edit</el-button>
+                <el-button v-if="editMode" size="small" type="success" plain @click.stop="setEpicDone(scope.row, true)">Done</el-button>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isMobile" label="Priority" width="110">
+          <template #default="scope">
+            <el-tag effect="dark" :type="priorityTagType(scope.row.priorityTag)">{{ scope.row.priorityTag }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="linkedTasks" label="Tasks" :width="isMobile ? 76 : 90" />
+        <el-table-column v-if="!isMobile" prop="triggeredTasks" label="Triggered" width="100" />
+        <el-table-column v-if="!isMobile" prop="waitingTasks" label="Waiting" width="90" />
+      </el-table>
+    </el-card>
+
+    <el-card class="settings-block epic-done-block" v-loading="loading">
+      <template #header>
+        <div class="epic-table-header">
+          <strong>Done epics</strong>
+          <span>Completed epics stay here so active planning stays focused.</span>
+        </div>
+      </template>
+      <el-table
+        :data="doneRows"
+        row-key="key"
+        :expand-row-keys="expandedEpicKeys"
+        empty-text="No done epics yet"
+        class="epic-table epic-table-done"
+        @row-click="toggleEpicRow"
+        @expand-change="syncExpandedRows"
+      >
+        <el-table-column type="expand" width="52">
+          <template #default="scope">
+            <div class="epic-detail">
+              <div class="epic-detail-head">
+                <strong>{{ scope.row.relatedTasks.length }} open related tasks</strong>
+                <span>Done epics are separated from active planning.</span>
+              </div>
+              <div v-if="scope.row.relatedTasks.length" class="epic-task-list">
+                <article v-for="task in scope.row.relatedTasks" :key="task.taskId" class="epic-task-item">
+                  <el-button link class="epic-task-link" @click.stop="openTask(task.task)">
+                    {{ task.title }}
+                  </el-button>
+                  <div class="epic-task-meta">
+                    <el-tag size="small" effect="light" :type="taskStateTagType(task.triggered)">
+                      {{ task.triggered ? 'triggered' : 'waiting' }}
+                    </el-tag>
+                    <el-tag size="small" effect="plain" :type="workflowTagType(task.workflowDisplay)">
+                      {{ workflowLabel(task.workflowDisplay) }}
+                    </el-tag>
+                    <el-tag v-if="shouldShowStatus(task.status)" size="small" effect="plain" :type="taskStatusTagType(task.status)">
+                      {{ statusLabel(task.status) }}
+                    </el-tag>
+                    <el-tag v-if="task.importance === 'high'" size="small" effect="plain" type="danger">
+                      high priority
+                    </el-tag>
+                    <span class="epic-task-trigger">{{ task.triggerDisplay }}</span>
+                    <span v-if="formatDue(task.dueDateTime)" class="epic-task-due">{{ formatDue(task.dueDateTime) }}</span>
+                  </div>
+                </article>
+              </div>
+              <el-empty v-else description="No open tasks are linked to this done epic." :image-size="72" />
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="Name" min-width="220" show-overflow-tooltip>
+          <template #default="scope">
+            <div class="epic-name-cell">
+              <div class="epic-name-stack">
+                <span class="epic-name-text">{{ scope.row.name }}</span>
+                <span class="epic-key-text">{{ scope.row.key }}</span>
+              </div>
+              <div class="epic-name-actions">
+                <el-tag size="small" effect="plain" type="success">Done</el-tag>
+                <el-tag v-if="isMobile" size="small" effect="dark" :type="priorityTagType(scope.row.priorityTag)">{{ scope.row.priorityTag }}</el-tag>
+                <el-button v-if="editMode" size="small" type="primary" @click.stop="openEdit(scope.row)">Edit</el-button>
+                <el-button v-if="editMode" size="small" plain @click.stop="setEpicDone(scope.row, false)">Restore</el-button>
               </div>
             </div>
           </template>
