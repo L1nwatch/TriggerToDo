@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.graph import OPEN_EXTENSION_NAME, build_extension_payload
-from app.models import TodoListCache, TodoTaskCache
+from app.models import TodoListCache, TodoTaskCache, TriggerEpic
 from app.schemas import GraphListCreate, GraphListUpdate, GraphTaskCreate, GraphTaskUpdate
 
 router = APIRouter(prefix="/api/todo", tags=["todo"])
@@ -134,6 +134,22 @@ def _epic_key_from_raw_json(raw_json: str | None) -> str | None:
         if ext.get("extensionName") == OPEN_EXTENSION_NAME and ext.get("epicKey"):
             return str(ext.get("epicKey"))
     return None
+
+
+def _is_completed_epic_status(status: str | None) -> bool:
+    value = str(status or "").lower()
+    return any(marker in value for marker in ("done", "closed", "resolved", "complete"))
+
+
+def _active_epic_key_or_none(db: Session, epic_key: str | None) -> str | None:
+    key = str(epic_key or "").strip().upper()
+    if not key:
+        return None
+
+    row = db.query(TriggerEpic).filter(TriggerEpic.epic_key == key).first()
+    if row and _is_completed_epic_status(row.status):
+        return None
+    return key
 
 
 def _to_task_dict(row: TodoTaskCache) -> dict[str, Any]:
@@ -330,7 +346,7 @@ def create_task(list_id: str, payload: GraphTaskCreate, request: Request, db: Se
     ext = payload.extensions.model_dump(exclude_none=True)
 
     source = ext.get("source") or "triggertodo"
-    epic_key = ext.get("epicKey")
+    epic_key = _active_epic_key_or_none(db, ext.get("epicKey"))
 
     row = TodoTaskCache(
         graph_list_id=list_id,
@@ -425,7 +441,7 @@ def update_task(list_id: str, task_id: str, payload: GraphTaskUpdate, request: R
             if "source" in ext_fields:
                 ext["source"] = ext_fields.get("source")
             if "epicKey" in ext_fields:
-                ext["epicKey"] = ext_fields.get("epicKey")
+                ext["epicKey"] = _active_epic_key_or_none(db, ext_fields.get("epicKey"))
             raw["extensions"] = extensions
             row.raw_json = json.dumps(raw)
 
@@ -470,7 +486,7 @@ def complete_task(list_id: str, task_id: str, request: Request, db: Session = De
     next_due = _next_due_datetime(row.due_datetime, row.recurrence_json, row.trigger_ref)
     if next_due:
         source = _source_from_raw_json(row.raw_json) or "triggertodo"
-        epic_key = _epic_key_from_raw_json(row.raw_json)
+        epic_key = _active_epic_key_or_none(db, _epic_key_from_raw_json(row.raw_json))
         next_row = TodoTaskCache(
             graph_list_id=row.graph_list_id,
             graph_task_id=f"local-task-{uuid4().hex}",

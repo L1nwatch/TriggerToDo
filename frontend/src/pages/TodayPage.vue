@@ -109,14 +109,21 @@ function priorityLabel(task: TodoTask) {
   return epicPriorityByKey.value.get(epicKey) || 'Unknown'
 }
 
+function isCompletedStatus(status?: string) {
+  const value = (status || '').toLowerCase()
+  return value.includes('done') || value.includes('closed') || value.includes('resolved') || value.includes('complete')
+}
+
 async function loadEpicPriorities() {
   try {
     const response = await listEpics()
     const map = new Map<string, 'P0' | 'P1' | 'P2' | 'P3'>()
-    epicOptions.value = response.items.map((epic) => ({
-      value: epic.epic_key,
-      label: epic.name || 'Unnamed Epic',
-    }))
+    epicOptions.value = response.items
+      .filter((epic) => !isCompletedStatus(epic.status))
+      .map((epic) => ({
+        value: epic.epic_key,
+        label: epic.name || 'Unnamed Epic',
+      }))
     for (const epic of response.items || []) {
       const fromSummary = extractPriorityFromSummary(epic.name)
       const fromPriority = toPriorityP(epic.priority)

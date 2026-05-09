@@ -323,10 +323,12 @@ async function loadEpics() {
     ])
     events.value = eventsData.items
     lists.value = listsData
-    epicOptions.value = epicsData.items.map((epic) => ({
-      value: epic.epic_key,
-      label: epic.name || 'Unnamed Epic',
-    }))
+    epicOptions.value = epicsData.items
+      .filter((epic) => !isCompletedStatus(epic.status))
+      .map((epic) => ({
+        value: epic.epic_key,
+        label: epic.name || 'Unnamed Epic',
+      }))
     const eventsById = new Map<number, TriggerEvent>(events.value.map((event) => [event.id, event]))
     const taskMap = new Map<string, RelatedEpicTask[]>()
 

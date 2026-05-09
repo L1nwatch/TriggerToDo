@@ -177,10 +177,12 @@ async function loadBoard() {
     ])
     lists.value = data.lists
     triggerEvents.value = eventsData.items
-    epicOptions.value = epicsData.items.map((epic) => ({
-      value: epic.epic_key,
-      label: epic.name || 'Unnamed Epic',
-    }))
+    epicOptions.value = epicsData.items
+      .filter((epic) => !isCompletedStatus(epic.status))
+      .map((epic) => ({
+        value: epic.epic_key,
+        label: epic.name || 'Unnamed Epic',
+      }))
     const priorityMap = new Map<string, 'P0' | 'P1' | 'P2' | 'P3'>()
     for (const epic of epicsData.items) {
       const p = toPriorityP(epic.priority)

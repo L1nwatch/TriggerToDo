@@ -23,6 +23,11 @@ const editingTask = ref<TodoTask | null>(null)
 const editForm = ref<TaskFormModel>(defaultTaskForm(''))
 const triggerTypeFilter = ref<'all' | 'date-trigger' | 'event-trigger'>('all')
 
+function isCompletedStatus(status?: string) {
+  const value = (status || '').toLowerCase()
+  return value.includes('done') || value.includes('closed') || value.includes('resolved') || value.includes('complete')
+}
+
 function cacheItemToTask(item: {
   listId: string
   taskId: string
@@ -290,10 +295,12 @@ async function loadData() {
     events.value = eventsResult.items
     tasks.value = cache.items.map(cacheItemToTask)
     lists.value = listsResult
-    epicOptions.value = epicsResult.items.map((epic) => ({
-      value: epic.epic_key,
-      label: epic.name || 'Unnamed Epic',
-    }))
+    epicOptions.value = epicsResult.items
+      .filter((epic) => !isCompletedStatus(epic.status))
+      .map((epic) => ({
+        value: epic.epic_key,
+        label: epic.name || 'Unnamed Epic',
+      }))
   } catch (error) {
     ElMessage.error((error as Error).message || 'Failed to load trigger management data')
   } finally {

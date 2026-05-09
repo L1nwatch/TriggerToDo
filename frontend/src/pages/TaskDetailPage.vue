@@ -23,6 +23,11 @@ const form = reactive<TaskFormModel>(defaultTaskForm(''))
 const listId = String(route.params.listId)
 const taskId = String(route.params.taskId)
 
+function isCompletedStatus(status?: string) {
+  const value = (status || '').toLowerCase()
+  return value.includes('done') || value.includes('closed') || value.includes('resolved') || value.includes('complete')
+}
+
 async function loadTask() {
   loading.value = true
   try {
@@ -36,10 +41,12 @@ async function loadTask() {
     ])
     lists.value = listsData
     triggerEvents.value = eventsData.items
-    epicOptions.value = epicsData.items.map((epic) => ({
-      value: epic.epic_key,
-      label: epic.name || 'Unnamed Epic',
-    }))
+    epicOptions.value = epicsData.items
+      .filter((epic) => !isCompletedStatus(epic.status))
+      .map((epic) => ({
+        value: epic.epic_key,
+        label: epic.name || 'Unnamed Epic',
+      }))
     if (!task) {
       ElMessage.error('Task not found')
       router.replace({ path: '/board/triggered' })
