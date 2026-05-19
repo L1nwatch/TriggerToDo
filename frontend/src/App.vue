@@ -30,7 +30,11 @@ function isCompletedStatus(status?: string) {
 
 async function loadSidebarCounts() {
   try {
-    const [data, epicsData, milestonesData] = await Promise.all([fetchAllTasks(), listEpics(), listMilestones()])
+    const [data, epicsData, milestonesData] = await Promise.all([
+      fetchAllTasks(),
+      listEpics(),
+      listMilestones().catch(() => ({ count: 0, items: [] })),
+    ])
     const openTasks = data.tasks.filter((task) => task.status !== 'completed' && isOnOrAfterBoardCutoff(task))
     sidebarCounts.epics = epicsData.items.filter((epic) => !isCompletedStatus(epic.status)).length
     sidebarCounts.milestones = milestonesData.count
