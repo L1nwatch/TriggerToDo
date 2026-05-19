@@ -76,3 +76,35 @@ export interface TriggerEvent {
   occurred_at?: string | null
   updated_at: string
 }
+
+export interface TriggerMilestoneEpic {
+  epic_key: string
+  name: string
+  status?: string | null
+  priority?: string | null
+}
+
+export interface TriggerMilestoneTask {
+  task_id: string
+  list_id?: string | null
+  title: string
+  status?: string | null
+  due_datetime?: string | null
+}
+
+export interface TriggerMilestone {
+  id: number
+  title: string
+  milestone_at?: string | null
+  location?: string | null
+  notes?: string | null
+  updated_at: string
+  epic_keys: string[]
+  task_ids: string[]
+  summary: {
+    epics: number
+    tasks: number
+  }
+  epics: TriggerMilestoneEpic[]
+  tasks: TriggerMilestoneTask[]
+}

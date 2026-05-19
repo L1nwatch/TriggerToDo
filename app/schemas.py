@@ -87,3 +87,21 @@ class TriggerEpicUpdate(BaseModel):
     name: Optional[str] = None
     status: Optional[str] = None
     priority: Optional[str] = None
+
+
+class TriggerMilestoneCreate(BaseModel):
+    title: str
+    milestone_at: Optional[str] = None
+    location: Optional[str] = None
+    notes: Optional[str] = None
+    epic_keys: list[str] = Field(default_factory=list)
+    task_ids: list[str] = Field(default_factory=list)
+
+
+class TriggerMilestoneUpdate(BaseModel):
+    title: Optional[str] = None
+    milestone_at: Optional[str] = None
+    location: Optional[str] = None
+    notes: Optional[str] = None
+    epic_keys: Optional[list[str]] = None
+    task_ids: Optional[list[str]] = None

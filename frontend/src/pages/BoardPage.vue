@@ -366,7 +366,6 @@ onMounted(loadBoard)
         <div class="task-main task-main-single">
           <h3 class="task-title-inline">{{ task.title }}</h3>
           <div class="task-inline-meta task-inline-meta-single">
-            <el-tag size="small" effect="plain" type="info">{{ task.source }}</el-tag>
             <span v-if="priorityLabel(task) !== 'Unknown'">Priority: {{ priorityLabel(task) }}</span>
             <span>Trigger: {{ triggerLabel(task) }}</span>
           </div>
@@ -400,7 +399,6 @@ onMounted(loadBoard)
           >
             <h3>{{ task.title }}</h3>
             <div class="kanban-meta">
-              <span class="meta-chip">Source: {{ task.source }}</span>
               <span v-if="priorityLabel(task) !== 'Unknown'" class="meta-chip">Priority: {{ priorityLabel(task) }}</span>
               <span class="meta-chip">Trigger: {{ triggerLabel(task) }}</span>
             </div>

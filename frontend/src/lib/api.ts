@@ -1,4 +1,4 @@
-import type { TodoList, TodoTask, TriggerEvent, TriggerRule, TriggerRuleWithMonitor } from './types'
+import type { TodoList, TodoTask, TriggerEvent, TriggerMilestone, TriggerRule, TriggerRuleWithMonitor } from './types'
 import { isOnOrAfterBoardCutoff } from './boardCutoff'
 
 const JSON_HEADERS = {
@@ -257,6 +257,50 @@ export async function updateEpic(epicId: number, payload: { name?: string; statu
   }>(`/api/epics/${epicId}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
+  })
+}
+
+export async function listMilestones() {
+  return request<{
+    count: number
+    items: TriggerMilestone[]
+  }>('/api/milestones')
+}
+
+export async function createMilestone(payload: {
+  title: string
+  milestone_at?: string | null
+  location?: string | null
+  notes?: string | null
+  epic_keys?: string[]
+  task_ids?: string[]
+}) {
+  return request<TriggerMilestone>('/api/milestones', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateMilestone(
+  milestoneId: number,
+  payload: {
+    title?: string
+    milestone_at?: string | null
+    location?: string | null
+    notes?: string | null
+    epic_keys?: string[]
+    task_ids?: string[]
+  },
+) {
+  return request<TriggerMilestone>(`/api/milestones/${milestoneId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteMilestone(milestoneId: number) {
+  return request<{ ok: boolean }>(`/api/milestones/${milestoneId}`, {
+    method: 'DELETE',
   })
 }
 

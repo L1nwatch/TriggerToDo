@@ -1,19 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { fetchAllTasks, listEpics } from './lib/api'
+import { fetchAllTasks, listEpics, listMilestones } from './lib/api'
 import { isOnOrAfterBoardCutoff } from './lib/boardCutoff'
 import { hasAnyTriggerConfigured } from './lib/triggerSignal'
 
 const route = useRoute()
 const sidebarCounts = reactive({
   epics: 0,
+  milestones: 0,
   triggered: 0,
   waiting: 0,
 })
 
 const activePath = computed(() => {
   if (route.path.startsWith('/epics')) return '/epics'
+  if (route.path.startsWith('/milestones')) return '/milestones'
   if (route.path.startsWith('/events')) return '/events'
   if (route.path.startsWith('/triggers') || route.path.startsWith('/settings')) return '/triggers'
   if (route.path.startsWith('/board/triggered')) return '/board/triggered'
@@ -28,13 +30,15 @@ function isCompletedStatus(status?: string) {
 
 async function loadSidebarCounts() {
   try {
-    const [data, epicsData] = await Promise.all([fetchAllTasks(), listEpics()])
+    const [data, epicsData, milestonesData] = await Promise.all([fetchAllTasks(), listEpics(), listMilestones()])
     const openTasks = data.tasks.filter((task) => task.status !== 'completed' && isOnOrAfterBoardCutoff(task))
     sidebarCounts.epics = epicsData.items.filter((epic) => !isCompletedStatus(epic.status)).length
+    sidebarCounts.milestones = milestonesData.count
     sidebarCounts.triggered = openTasks.filter((task) => hasAnyTriggerConfigured(task)).length
     sidebarCounts.waiting = openTasks.length - sidebarCounts.triggered
   } catch {
     sidebarCounts.epics = 0
+    sidebarCounts.milestones = 0
     sidebarCounts.triggered = 0
     sidebarCounts.waiting = 0
   }
@@ -64,6 +68,12 @@ watch(
           <span class="menu-item-row">
             <span>Epics</span>
             <el-tag size="small" effect="dark" class="nav-count nav-count-epics">{{ sidebarCounts.epics }}</el-tag>
+          </span>
+        </el-menu-item>
+        <el-menu-item index="/milestones">
+          <span class="menu-item-row">
+            <span>Milestones</span>
+            <el-tag size="small" effect="dark" class="nav-count nav-count-epics">{{ sidebarCounts.milestones }}</el-tag>
           </span>
         </el-menu-item>
         <el-menu-item index="/board/triggered">

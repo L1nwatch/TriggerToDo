@@ -113,6 +113,29 @@ class TriggerEpic(Base):
     __table_args__ = (Index("ix_trigger_epic_key_unique", "epic_key", unique=True),)
 
 
+class TriggerMilestone(Base):
+    __tablename__ = "trigger_milestone"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(512))
+    milestone_at: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    location: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class TriggerMilestoneLink(Base):
+    __tablename__ = "trigger_milestone_link"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    milestone_id: Mapped[int] = mapped_column(Integer, ForeignKey("trigger_milestone.id"), index=True)
+    link_type: Mapped[str] = mapped_column(String(16), index=True)
+    ref_id: Mapped[str] = mapped_column(String(128), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (Index("ix_trigger_milestone_link_unique", "milestone_id", "link_type", "ref_id", unique=True),)
+
+
 class JiraIssueOverride(Base):
     __tablename__ = "jira_issue_override"
 
