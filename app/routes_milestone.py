@@ -99,7 +99,7 @@ def _serialize(row: TriggerMilestone, db: Session) -> dict:
 @router.get("")
 def list_milestones(request: Request, db: Session = Depends(get_db)):
     _ = request
-    rows = db.query(TriggerMilestone).order_by(TriggerMilestone.milestone_at.asc(), TriggerMilestone.id.asc()).all()
+    rows = db.query(TriggerMilestone).order_by(TriggerMilestone.milestone_at.desc(), TriggerMilestone.id.desc()).all()
     return {"count": len(rows), "items": [_serialize(row, db) for row in rows]}
 
 

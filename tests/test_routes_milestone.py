@@ -64,3 +64,20 @@ def test_delete_milestone_removes_row(db_session) -> None:
 
     assert delete_milestone(created["id"], request=None, db=db_session) == {"ok": True}
     assert list_milestones(request=None, db=db_session) == {"count": 0, "items": []}
+
+
+def test_list_milestones_sorts_newest_first(db_session) -> None:
+    create_milestone(
+        TriggerMilestoneCreate(title="Older", milestone_at="2026-05-01T09:00"),
+        request=None,
+        db=db_session,
+    )
+    create_milestone(
+        TriggerMilestoneCreate(title="Newer", milestone_at="2026-06-01T09:00"),
+        request=None,
+        db=db_session,
+    )
+
+    listed = list_milestones(request=None, db=db_session)
+
+    assert [item["title"] for item in listed["items"]] == ["Newer", "Older"]

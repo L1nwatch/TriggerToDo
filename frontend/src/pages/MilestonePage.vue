@@ -47,11 +47,10 @@ const totals = computed(() => {
     for (const key of milestone.epic_keys || []) epicKeys.add(key)
     for (const taskId of milestone.task_ids || []) taskIds.add(taskId)
   }
-  const next = milestones.value.find((item) => {
-    if (!item.milestone_at) return false
-    const time = new Date(item.milestone_at).getTime()
-    return Number.isFinite(time) && time >= Date.now()
-  })
+  const next = milestones.value
+    .map((item) => ({ item, time: item.milestone_at ? new Date(item.milestone_at).getTime() : Number.NaN }))
+    .filter(({ time }) => Number.isFinite(time) && time >= Date.now())
+    .sort((a, b) => a.time - b.time)[0]?.item
   return {
     milestones: milestones.value.length,
     epics: epicKeys.size,
