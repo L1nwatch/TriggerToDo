@@ -696,6 +696,510 @@ body {
   font-size: 13px;
 }
 
+.scrum-page .page-head {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 75%, #dfe6e2 25%);
+  background:
+    radial-gradient(circle at top right, #e8f5f1 0%, transparent 34%),
+    radial-gradient(circle at bottom left, #edf3ff 0%, transparent 42%),
+    var(--surface);
+}
+
+.scrum-target-panel {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(320px, 1.2fr);
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+
+.scrum-controls,
+.scrum-progress,
+.scrum-guide-block {
+  border: 1px solid color-mix(in srgb, var(--line) 78%, #e2e8df 22%);
+  border-radius: 12px;
+  background: #fffdfa;
+  padding: 14px;
+  min-width: 0;
+}
+
+.scrum-controls {
+  display: flex;
+  align-items: center;
+}
+
+.scrum-controls .el-form {
+  width: 100%;
+}
+
+.scrum-control-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 170px);
+  gap: 10px;
+}
+
+.scrum-control-grid .el-form-item {
+  margin-bottom: 0;
+}
+
+.scrum-control-grid .el-form-item:last-child {
+  grid-column: 1 / -1;
+}
+
+.scrum-button-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scrum-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scrum-kpi {
+  min-height: 74px;
+  border: 1px solid color-mix(in srgb, var(--line) 76%, #e7e1d4 24%);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: linear-gradient(140deg, #fffdf7 0%, #ffffff 100%);
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.scrum-kpi .metric-value {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.scrum-kpi-target .metric-value {
+  color: #2f6f95;
+}
+
+.scrum-kpi-planned .metric-value {
+  color: #1f7a56;
+}
+
+.scrum-kpi-remaining .metric-value {
+  color: #8a5b12;
+}
+
+.scrum-kpi-guide .el-tag {
+  width: fit-content;
+}
+
+.scrum-progress {
+  grid-column: 1 / -1;
+}
+
+.scrum-progress-head,
+.scrum-guide-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.scrum-progress-head span,
+.scrum-guide-head span,
+.scrum-progress p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.scrum-progress p {
+  margin: 8px 0 0;
+}
+
+.scrum-history-panel {
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.scrum-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.scrum-history-head span {
+  color: #6b778c;
+  font-size: 13px;
+}
+
+.scrum-history-chart {
+  display: grid;
+  gap: 0;
+  border: 1px solid #ebecf0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.scrum-history-legend {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 8px 10px;
+  background: #f4f5f7;
+  border-bottom: 1px solid #ebecf0;
+  color: #6b778c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scrum-history-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.legend-committed {
+  background: #6b778c;
+}
+
+.legend-completed {
+  background: #0052cc;
+}
+
+.scrum-velocity-chart {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  min-height: 250px;
+}
+
+.scrum-velocity-axis {
+  height: 178px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  color: #6b778c;
+  font-size: 11px;
+  padding-top: 2px;
+}
+
+.scrum-velocity-plot {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+  gap: 10px;
+  align-items: end;
+  padding-top: 2px;
+}
+
+.scrum-velocity-grid {
+  position: absolute;
+  inset: 2px 0 52px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.scrum-velocity-grid span {
+  border-top: 1px solid #ebecf0;
+}
+
+.scrum-velocity-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 8px;
+  background: rgba(222, 235, 255, 0.55);
+  border-top: 1px solid rgba(0, 82, 204, 0.25);
+  border-bottom: 1px solid rgba(0, 82, 204, 0.25);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.scrum-velocity-band span {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #0747a6;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.scrum-velocity-average {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid #0052cc;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.scrum-velocity-average span {
+  position: absolute;
+  right: 6px;
+  top: -22px;
+  color: #0747a6;
+  font-size: 11px;
+  font-weight: 700;
+  background: #deebff;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.scrum-velocity-sprint {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: 178px auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.scrum-velocity-stacked-bar {
+  width: 30px;
+  min-height: 5px;
+  border-radius: 3px 3px 0 0;
+  overflow: visible;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-self: center;
+  align-self: end;
+  background: #f4f5f7;
+}
+
+.scrum-velocity-total {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #42526e;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.scrum-velocity-segment {
+  width: 100%;
+}
+
+.scrum-velocity-segment-remaining {
+  background: #6b778c;
+  border-radius: 3px 3px 0 0;
+}
+
+.scrum-velocity-segment-completed {
+  background: #0052cc;
+  border-radius: 0 0 3px 3px;
+  position: relative;
+}
+
+.scrum-velocity-segment-completed span {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.scrum-velocity-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #42526e;
+  font-size: 12px;
+  text-align: center;
+}
+
+.story-point-select {
+  width: 76px;
+}
+
+.story-point-select .el-select__wrapper {
+  min-height: 28px;
+  border-radius: 3px;
+  background: #f4f5f7;
+  box-shadow: inset 0 0 0 1px #dfe1e6;
+  font-weight: 700;
+  color: #172b4d;
+}
+
+.scrum-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.scrum-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 34px;
+}
+
+.scrum-chip-row .el-empty {
+  --el-empty-padding: 0;
+}
+
+.scrum-table-card,
+.scrum-table {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.scrum-epic-cell {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.scrum-epic-cell strong,
+.scrum-epic-cell span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scrum-epic-cell span {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.scrum-board-section {
+  border: 1px solid color-mix(in srgb, var(--line) 78%, #e2e8df 22%);
+  border-radius: 12px;
+  background: #fffdfa;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.scrum-active-summary {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.scrum-board-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.scrum-board-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.scrum-board-col {
+  border: 1px solid color-mix(in srgb, var(--line) 76%, #e7e1d4 24%);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fffef8 0%, #faf7ee 100%);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.scrum-board-col header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, #eee7dc 28%);
+  font-weight: 700;
+}
+
+.scrum-board-stack {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 220px;
+  padding: 10px;
+}
+
+.scrum-task-card {
+  border: 1px solid color-mix(in srgb, var(--line) 76%, #ebe4d8 24%);
+  border-radius: 10px;
+  padding: 10px;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(49, 42, 31, 0.05);
+  min-width: 0;
+  cursor: grab;
+  transition: opacity 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.scrum-task-card:active {
+  cursor: grabbing;
+}
+
+.scrum-task-card.is-dragging {
+  opacity: 0.55;
+  transform: scale(0.98);
+  box-shadow: none;
+}
+
+.scrum-task-title {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.scrum-task-title strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.scrum-task-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.scrum-task-meta span {
+  border: 1px solid color-mix(in srgb, var(--line) 72%, #ede8dd 28%);
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: #fffbf3;
+}
+
 .milestone-page .page-head {
   padding: 14px 16px;
   border-radius: 14px;
@@ -1459,6 +1963,38 @@ body {
   .epic-actions .el-select,
   .epic-actions .el-button {
     width: 100% !important;
+  }
+
+  .scrum-target-panel,
+  .scrum-guide-grid,
+  .scrum-board-grid,
+  .scrum-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scrum-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scrum-controls {
+    align-items: stretch;
+  }
+
+  .scrum-velocity-chart {
+    grid-template-columns: 30px 1fr;
+    overflow-x: auto;
+  }
+
+  .scrum-velocity-plot {
+    min-width: 420px;
+  }
+
+  .scrum-velocity-stacked-bar {
+    width: 24px;
+  }
+
+  .scrum-button-row .el-button {
+    flex: 1 1 130px;
   }
 
   .recurrence-inline {

@@ -12,6 +12,7 @@ from app.db import Base, engine
 from app.routes_epic import router as epic_router
 from app.routes_event import router as event_router
 from app.routes_milestone import router as milestone_router
+from app.routes_scrum import router as scrum_router
 from app.routes_todo import router as todo_router
 from app.routes_trigger import router as trigger_router
 from app.trigger_engine import TriggerEngine
@@ -54,6 +55,7 @@ app.add_middleware(
 app.include_router(epic_router)
 app.include_router(event_router)
 app.include_router(milestone_router)
+app.include_router(scrum_router)
 app.include_router(todo_router)
 app.include_router(trigger_router)
 

@@ -1,4 +1,4 @@
-import type { TodoList, TodoTask, TriggerEvent, TriggerMilestone, TriggerRule, TriggerRuleWithMonitor } from './types'
+import type { TodoList, TodoTask, TriggerEvent, TriggerMilestone, TriggerRule, TriggerRuleWithMonitor, TriggerScrum } from './types'
 import { isOnOrAfterBoardCutoff } from './boardCutoff'
 
 const JSON_HEADERS = {
@@ -301,6 +301,71 @@ export async function updateMilestone(
 export async function deleteMilestone(milestoneId: number) {
   return request<{ ok: boolean }>(`/api/milestones/${milestoneId}`, {
     method: 'DELETE',
+  })
+}
+
+export async function listScrums() {
+  return request<{
+    count: number
+    items: TriggerScrum[]
+  }>('/api/scrums')
+}
+
+export async function getActiveScrum() {
+  return request<{
+    item: TriggerScrum | null
+  }>('/api/scrums/active')
+}
+
+export async function createScrum(payload: {
+  name: string
+  goal?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  target_points?: number
+  status?: 'draft' | 'active' | 'completed'
+  items?: Array<{ list_id: string; task_id: string; points: number; status?: 'todo' | 'doing' | 'done' }>
+}) {
+  return request<TriggerScrum>('/api/scrums', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateScrum(
+  scrumId: number,
+  payload: {
+    name?: string
+    goal?: string | null
+    start_date?: string | null
+    end_date?: string | null
+    target_points?: number
+    status?: 'draft' | 'active' | 'completed'
+    items?: Array<{ list_id: string; task_id: string; points: number; status?: 'todo' | 'doing' | 'done' }>
+  },
+) {
+  return request<TriggerScrum>(`/api/scrums/${scrumId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function startScrum(scrumId: number) {
+  return request<TriggerScrum>(`/api/scrums/${scrumId}/start`, {
+    method: 'POST',
+  })
+}
+
+export async function completeScrum(scrumId: number) {
+  return request<TriggerScrum>(`/api/scrums/${scrumId}/complete`, {
+    method: 'POST',
+  })
+}
+
+export async function updateScrumItemStatus(scrumId: number, itemId: number, status: 'todo' | 'doing' | 'done') {
+  return request<TriggerScrum>(`/api/scrums/${scrumId}/items/${itemId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
   })
 }
 

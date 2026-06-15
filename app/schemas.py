@@ -105,3 +105,34 @@ class TriggerMilestoneUpdate(BaseModel):
     notes: Optional[str] = None
     epic_keys: Optional[list[str]] = None
     task_ids: Optional[list[str]] = None
+
+
+class TriggerScrumItemCreate(BaseModel):
+    list_id: str
+    task_id: str
+    points: int = 0
+    status: str = "todo"
+
+
+class TriggerScrumCreate(BaseModel):
+    name: str
+    goal: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    target_points: int = 0
+    status: str = "draft"
+    items: list[TriggerScrumItemCreate] = Field(default_factory=list)
+
+
+class TriggerScrumUpdate(BaseModel):
+    name: Optional[str] = None
+    goal: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    target_points: Optional[int] = None
+    status: Optional[str] = None
+    items: Optional[list[TriggerScrumItemCreate]] = None
+
+
+class TriggerScrumItemStatusUpdate(BaseModel):
+    status: str

@@ -136,6 +136,35 @@ class TriggerMilestoneLink(Base):
     __table_args__ = (Index("ix_trigger_milestone_link_unique", "milestone_id", "link_type", "ref_id", unique=True),)
 
 
+class TriggerScrum(Base):
+    __tablename__ = "trigger_scrum"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(512))
+    goal: Mapped[str | None] = mapped_column(Text, nullable=True)
+    start_date: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    end_date: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    target_points: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class TriggerScrumItem(Base):
+    __tablename__ = "trigger_scrum_item"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scrum_id: Mapped[int] = mapped_column(Integer, ForeignKey("trigger_scrum.id"), index=True)
+    graph_list_id: Mapped[str] = mapped_column(String(128), index=True)
+    graph_task_id: Mapped[str] = mapped_column(String(128), index=True)
+    points: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(32), default="todo", index=True)
+    added_after_start: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (Index("ix_trigger_scrum_item_unique", "scrum_id", "graph_list_id", "graph_task_id", unique=True),)
+
+
 class JiraIssueOverride(Base):
     __tablename__ = "jira_issue_override"
 

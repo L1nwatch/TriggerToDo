@@ -108,3 +108,48 @@ export interface TriggerMilestone {
   epics: TriggerMilestoneEpic[]
   tasks: TriggerMilestoneTask[]
 }
+
+export interface TriggerScrumTask {
+  list_id: string
+  task_id: string
+  title: string
+  status?: string | null
+  wf_status?: string | null
+  importance?: string | null
+  due_datetime?: string | null
+  trigger_ref?: string | null
+  epic_key?: string | null
+  source?: TaskSource | null
+}
+
+export interface TriggerScrumItem {
+  id: number
+  list_id: string
+  task_id: string
+  points: number
+  status: 'todo' | 'doing' | 'done'
+  added_after_start: boolean
+  updated_at: string
+  task?: TriggerScrumTask | null
+}
+
+export interface TriggerScrum {
+  id: number
+  name: string
+  goal?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  target_points: number
+  status: 'draft' | 'active' | 'completed'
+  completed_at?: string | null
+  updated_at: string
+  summary: {
+    items: number
+    points: number
+    done_points: number
+    points_by_status: Record<'todo' | 'doing' | 'done', number>
+    count_by_status: Record<'todo' | 'doing' | 'done', number>
+    added_after_start: number
+  }
+  items: TriggerScrumItem[]
+}

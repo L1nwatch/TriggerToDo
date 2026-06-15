@@ -11,6 +11,7 @@ const router = createRouter({
     { path: '/', redirect: '/board/triggered' },
     { path: '/today', redirect: '/board/triggered' },
     { path: '/epics', name: 'epics', component: () => import('./pages/EpicPage.vue') },
+    { path: '/epics/scrum', name: 'epics-scrum', component: () => import('./pages/ScrumTargetPage.vue') },
     { path: '/milestones', name: 'milestones', component: () => import('./pages/MilestonePage.vue') },
     { path: '/board', redirect: '/board/triggered' },
     {
