@@ -438,9 +438,6 @@ onMounted(loadScrum)
           {{ activeScrum ? `${activeScrum.start_date || '-'} to ${activeScrum.end_date || '-'}` : `${candidateTasks.length} triggered task(s)` }}
         </p>
       </div>
-      <div class="actions">
-        <el-button @click="loadScrum" :loading="loading">Refresh</el-button>
-      </div>
     </header>
 
     <template v-if="activeScrum && activeScrum.status === 'active'">
