@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import TaskForm from '../components/TaskForm.vue'
 import {
   completeScrum,
   createScrum,
@@ -11,9 +12,12 @@ import {
   listTriggerEvents,
   updateScrum,
   updateScrumItemStatus,
+  updateTask,
 } from '../lib/api'
+import { builtInTriggerOptions } from '../lib/triggerCatalog'
 import { hasAnyTriggerConfigured, isTaskTriggered, triggerDisplay } from '../lib/triggerSignal'
-import type { TodoTask, TriggerEvent, TriggerScrum, TriggerScrumItem } from '../lib/types'
+import { defaultTaskForm, formFromTask, taskPayloadFromForm, type TaskFormModel } from '../lib/taskForm'
+import type { TodoList, TodoTask, TriggerEvent, TriggerScrum, TriggerScrumItem } from '../lib/types'
 
 type ScrumStatus = 'todo' | 'doing' | 'done'
 type PriorityTag = 'P0' | 'P1' | 'P2' | 'P3'
@@ -27,16 +31,25 @@ const columns: Array<{ status: ScrumStatus; label: string }> = [
 
 const loading = ref(false)
 const saving = ref(false)
+const editSaving = ref(false)
 const movingItemId = ref<number | null>(null)
 const draggingItemId = ref<number | null>(null)
 const lastTappedItem = ref<{ id: number; at: number } | null>(null)
 const tasks = ref<TodoTask[]>([])
+const lists = ref<TodoList[]>([])
 const triggerEvents = ref<TriggerEvent[]>([])
 const activeScrum = ref<TriggerScrum | null>(null)
 const scrumHistory = ref<TriggerScrum[]>([])
 const selectedTaskKeys = ref<string[]>([])
 const pointOverrides = ref<Record<string, number>>({})
+const epicOptions = ref<Array<{ value: string; label: string }>>([])
 const epicPriorityByKey = ref(new Map<string, PriorityTag>())
+const editDialogVisible = ref(false)
+const editingItem = ref<TriggerScrumItem | null>(null)
+const editForm = reactive<TaskFormModel>(defaultTaskForm(''))
+const editPoints = ref(1)
+const editStatus = ref<ScrumStatus>('todo')
+let cardClickTimer: number | null = null
 
 const today = new Date()
 const twoWeeks = new Date(today)
@@ -49,6 +62,14 @@ const draft = reactive({
   startDate: today.toISOString().slice(0, 10),
   endDate: twoWeeks.toISOString().slice(0, 10),
 })
+
+const triggerOptions = computed(() => [
+  ...builtInTriggerOptions(),
+  ...triggerEvents.value.map((event) => ({
+    value: `event:${event.id}`,
+    label: `event-trigger: ${event.name}${event.is_active ? ' (occurred)' : ''}`,
+  })),
+])
 
 function taskKey(task: TodoTask) {
   return `${task.listId}:${task.id}`
@@ -246,6 +267,51 @@ function boardEpic(item: TriggerScrumItem) {
   return String(extension(task)?.epicKey || item.task?.epic_key || 'No epic')
 }
 
+function editableTaskForItem(item: TriggerScrumItem): TodoTask {
+  const task = boardTask(item)
+  if (task) return task
+  return {
+    id: item.task_id,
+    listId: item.list_id,
+    source: item.task?.source || 'triggertodo',
+    title: item.task?.title || item.task_id,
+    status: item.task?.status || undefined,
+    body: { contentType: 'text', content: '' },
+    dueDateTime: item.task?.due_datetime ? { dateTime: item.task.due_datetime, timeZone: 'UTC' } : null,
+    extensions: [
+      {
+        extensionName: 'com.triggertodo.meta',
+        wfStatus: item.task?.wf_status || null,
+        triggerRef: item.task?.trigger_ref || null,
+        epicKey: item.task?.epic_key || null,
+        source: item.task?.source || null,
+      },
+    ],
+  }
+}
+
+function clearCardClickTimer() {
+  if (cardClickTimer === null) return
+  window.clearTimeout(cardClickTimer)
+  cardClickTimer = null
+}
+
+function openItemEditor(item: TriggerScrumItem) {
+  clearCardClickTimer()
+  editingItem.value = item
+  Object.assign(editForm, formFromTask(editableTaskForItem(item)))
+  editPoints.value = item.points
+  editStatus.value = item.status
+  editDialogVisible.value = true
+}
+
+function scheduleItemEditor(item: TriggerScrumItem) {
+  clearCardClickTimer()
+  cardClickTimer = window.setTimeout(() => {
+    openItemEditor(item)
+  }, DOUBLE_TAP_MS)
+}
+
 function isSelected(task: TodoTask) {
   return selectedTaskKeys.value.includes(taskKey(task))
 }
@@ -365,6 +431,7 @@ function onDragEnd() {
 }
 
 function toggleMoveSelection(item: TriggerScrumItem) {
+  clearCardClickTimer()
   draggingItemId.value = draggingItemId.value === item.id ? null : item.id
 }
 
@@ -388,6 +455,7 @@ function onCardTouchEnd(item: TriggerScrumItem, event: TouchEvent) {
     return
   }
   lastTappedItem.value = { id: item.id, at: now }
+  scheduleItemEditor(item)
 }
 
 async function onColumnPick(status: ScrumStatus) {
@@ -395,6 +463,45 @@ async function onColumnPick(status: ScrumStatus) {
   draggingItemId.value = null
   if (!item || item.status === status) return
   await moveItem(item, status)
+}
+
+async function submitItemEdit() {
+  if (!activeScrum.value || !editingItem.value) return
+  if (!editForm.title.trim()) {
+    ElMessage.warning('Title is required')
+    return
+  }
+  const points = Number(editPoints.value)
+  if (!Number.isFinite(points) || points < 1) {
+    ElMessage.warning('Story points must be at least 1')
+    return
+  }
+
+  editSaving.value = true
+  try {
+    const item = editingItem.value
+    await updateTask(editForm.listId, item.task_id, taskPayloadFromForm(editForm))
+
+    const items = activeScrum.value.items.map((scrumItem) => ({
+      list_id: scrumItem.list_id,
+      task_id: scrumItem.task_id,
+      points: scrumItem.id === item.id ? points : scrumItem.points,
+      status: scrumItem.id === item.id ? editStatus.value : scrumItem.status,
+    }))
+    const targetPoints = items.reduce((sum, scrumItem) => sum + scrumItem.points, 0)
+    activeScrum.value = await updateScrum(activeScrum.value.id, {
+      target_points: targetPoints,
+      items,
+    })
+    editDialogVisible.value = false
+    editingItem.value = null
+    await loadScrum()
+    ElMessage.success('Scrum task updated')
+  } catch (error) {
+    ElMessage.error((error as Error).message || 'Failed to update scrum task')
+  } finally {
+    editSaving.value = false
+  }
 }
 
 async function completeActiveScrum() {
@@ -420,11 +527,18 @@ async function loadScrum() {
       getActiveScrum(),
       listScrums(),
     ])
+    lists.value = taskData.lists
     tasks.value = taskData.tasks
     triggerEvents.value = eventsData.items
     activeScrum.value = activeData.item
     scrumHistory.value = historyData.items
     if (activeData.item) applyScrumToDraft(activeData.item)
+    epicOptions.value = epicsData.items
+      .filter((epic) => !isCompletedStatus(epic.status))
+      .map((epic) => ({
+        value: epic.epic_key,
+        label: epic.name || 'Unnamed Epic',
+      }))
 
     const priorityMap = new Map<string, PriorityTag>()
     for (const epic of epicsData.items) {
@@ -440,6 +554,7 @@ async function loadScrum() {
 }
 
 onMounted(loadScrum)
+onBeforeUnmount(clearCardClickTimer)
 </script>
 
 <template>
@@ -513,6 +628,7 @@ onMounted(loadScrum)
               draggable="true"
               @dragstart="onDragStart(item, $event)"
               @dragend="onDragEnd"
+              @click.stop="scheduleItemEditor(item)"
               @dblclick.stop="toggleMoveSelection(item)"
               @touchend.stop="onCardTouchEnd(item, $event)"
             >
@@ -706,5 +822,38 @@ onMounted(loadScrum)
         </el-table>
       </el-card>
     </template>
+
+    <el-dialog v-model="editDialogVisible" title="Edit Scrum Task" width="min(620px, 94vw)" class="scrum-task-dialog">
+      <el-form label-position="top" class="scrum-inline-edit" @submit.prevent>
+        <el-row :gutter="12">
+          <el-col :xs="12">
+            <el-form-item label="Story Points">
+              <el-select v-model="editPoints" class="field-full">
+                <el-option v-for="point in FIBONACCI_POINTS" :key="point" :label="String(point)" :value="point" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="12">
+            <el-form-item label="Scrum Status">
+              <el-select v-model="editStatus" class="field-full">
+                <el-option v-for="column in columns" :key="column.status" :label="column.label" :value="column.status" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <TaskForm
+        :model="editForm"
+        :lists="lists"
+        :readonly-list="true"
+        :hide-workflow-status="true"
+        :trigger-options="triggerOptions"
+        :epic-options="epicOptions"
+      />
+      <template #footer>
+        <el-button @click="editDialogVisible = false">Cancel</el-button>
+        <el-button type="primary" :loading="editSaving" @click="submitItemEdit">Save</el-button>
+      </template>
+    </el-dialog>
   </section>
 </template>
