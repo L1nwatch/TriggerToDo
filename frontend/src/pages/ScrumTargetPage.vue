@@ -29,6 +29,7 @@ const loading = ref(false)
 const saving = ref(false)
 const movingItemId = ref<number | null>(null)
 const draggingItemId = ref<number | null>(null)
+const lastTappedItem = ref<{ id: number; at: number } | null>(null)
 const tasks = ref<TodoTask[]>([])
 const triggerEvents = ref<TriggerEvent[]>([])
 const activeScrum = ref<TriggerScrum | null>(null)
@@ -40,6 +41,7 @@ const epicPriorityByKey = ref(new Map<string, PriorityTag>())
 const today = new Date()
 const twoWeeks = new Date(today)
 twoWeeks.setDate(today.getDate() + 13)
+const DOUBLE_TAP_MS = 360
 
 const draft = reactive({
   name: 'Current Sprint',
@@ -358,13 +360,12 @@ function onDragStart(item: TriggerScrumItem, event: DragEvent) {
   if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
 }
 
-function onMouseDragStart(item: TriggerScrumItem, event: MouseEvent) {
-  event.preventDefault()
-  draggingItemId.value = item.id
-}
-
 function onDragEnd() {
   draggingItemId.value = null
+}
+
+function toggleMoveSelection(item: TriggerScrumItem) {
+  draggingItemId.value = draggingItemId.value === item.id ? null : item.id
 }
 
 async function onDrop(status: ScrumStatus, event: DragEvent) {
@@ -377,10 +378,22 @@ async function onDrop(status: ScrumStatus, event: DragEvent) {
   await moveItem(item, status)
 }
 
-async function onMouseDrop(status: ScrumStatus) {
+function onCardTouchEnd(item: TriggerScrumItem, event: TouchEvent) {
+  const now = Date.now()
+  const previous = lastTappedItem.value
+  if (previous?.id === item.id && now - previous.at <= DOUBLE_TAP_MS) {
+    event.preventDefault()
+    toggleMoveSelection(item)
+    lastTappedItem.value = null
+    return
+  }
+  lastTappedItem.value = { id: item.id, at: now }
+}
+
+async function onColumnPick(status: ScrumStatus) {
   const item = activeScrum.value?.items.find((candidate) => candidate.id === draggingItemId.value)
   draggingItemId.value = null
-  if (!item) return
+  if (!item || item.status === status) return
   await moveItem(item, status)
 }
 
@@ -485,7 +498,7 @@ onMounted(loadScrum)
           class="scrum-board-col"
           @dragover.prevent
           @drop="onDrop(column.status, $event)"
-          @mouseup="onMouseDrop(column.status)"
+          @click="onColumnPick(column.status)"
         >
           <header>
             <span>{{ column.label }}</span>
@@ -500,7 +513,8 @@ onMounted(loadScrum)
               draggable="true"
               @dragstart="onDragStart(item, $event)"
               @dragend="onDragEnd"
-              @mousedown="onMouseDragStart(item, $event)"
+              @dblclick.stop="toggleMoveSelection(item)"
+              @touchend.stop="onCardTouchEnd(item, $event)"
             >
               <div class="scrum-task-title">
                 <strong>{{ boardTitle(item) }}</strong>
