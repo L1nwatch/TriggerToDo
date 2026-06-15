@@ -44,6 +44,7 @@ const selectedTaskKeys = ref<string[]>([])
 const pointOverrides = ref<Record<string, number>>({})
 const epicOptions = ref<Array<{ value: string; label: string }>>([])
 const epicPriorityByKey = ref(new Map<string, PriorityTag>())
+const manageTasksVisible = ref(false)
 const editDialogVisible = ref(false)
 const editingItem = ref<TriggerScrumItem | null>(null)
 const editForm = reactive<TaskFormModel>(defaultTaskForm(''))
@@ -673,6 +674,7 @@ onBeforeUnmount(clearCardClickTimer)
         <strong>{{ activeScrum.name }}</strong>
         <div class="scrum-button-row">
           <el-tag effect="dark" type="success">Active</el-tag>
+          <el-button plain @click="manageTasksVisible = true">Manage Tasks</el-button>
           <el-button type="danger" plain :loading="saving" @click="completeActiveScrum">Complete Scrum</el-button>
         </div>
       </div>
@@ -720,63 +722,6 @@ onBeforeUnmount(clearCardClickTimer)
         </article>
       </div>
     </section>
-      <el-card class="settings-block scrum-table-card" v-loading="loading">
-        <template #header>
-          <div class="epic-table-header">
-            <strong>Triggered task backlog</strong>
-            <span>{{ selectedTasks.length }} selected</span>
-          </div>
-          <div class="scrum-button-row">
-            <el-button @click="selectAllTriggered">Select Triggered</el-button>
-            <el-button @click="clearSelected">Clear</el-button>
-            <el-button type="primary" :loading="saving" :disabled="!selectedTasks.length" @click="addSelectedToActiveScrum">
-              Add Selected
-            </el-button>
-          </div>
-        </template>
-        <el-table :data="candidateTasks" row-key="id" empty-text="No unplanned triggered tasks found" class="epic-table scrum-table">
-          <el-table-column label="Scrum" width="96">
-            <template #default="scope">
-              <el-switch :model-value="isSelected(scope.row)" @change="(value: boolean) => setSelected(scope.row, value)" />
-            </template>
-          </el-table-column>
-          <el-table-column label="Task" min-width="260" show-overflow-tooltip>
-            <template #default="scope">
-              <div class="scrum-epic-cell">
-                <strong>{{ scope.row.title }}</strong>
-                <span>{{ triggerDisplay(scope.row, eventsById()) }}</span>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="Priority" width="110">
-            <template #default="scope">
-              <el-tag effect="dark" :type="priorityTagType(priorityLabel(scope.row))">{{ priorityLabel(scope.row) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="Points" width="142">
-            <template #default="scope">
-              <el-select
-                :model-value="pointsFor(scope.row)"
-                size="small"
-                class="story-point-select"
-                @change="(value: number) => setPoints(scope.row, value)"
-              >
-                <el-option v-for="point in FIBONACCI_POINTS" :key="point" :label="String(point)" :value="point" />
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column label="Status" width="110">
-            <template #default="scope">
-              <el-tag effect="plain">{{ normalizeWorkflowStatus(scope.row).toUpperCase() }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="Due" width="120">
-            <template #default="scope">
-              {{ formatDate(scope.row.dueDateTime?.dateTime) || '-' }}
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-card>
     </template>
 
     <template v-else>
@@ -949,6 +894,71 @@ onBeforeUnmount(clearCardClickTimer)
         </el-table>
       </el-card>
     </template>
+
+    <el-dialog v-model="manageTasksVisible" title="Manage Scrum Tasks" width="min(920px, 96vw)" class="scrum-task-dialog">
+      <div class="epic-table-header">
+        <strong>Triggered task backlog</strong>
+        <span>{{ selectedTasks.length }} selected</span>
+      </div>
+      <div class="scrum-button-row">
+        <el-button @click="selectAllTriggered">Select Triggered</el-button>
+        <el-button @click="clearSelected">Clear</el-button>
+        <el-button type="primary" :loading="saving" :disabled="!selectedTasks.length" @click="addSelectedToActiveScrum">
+          Add Selected
+        </el-button>
+      </div>
+      <el-table
+        v-loading="loading"
+        :data="candidateTasks"
+        row-key="id"
+        empty-text="No unplanned triggered tasks found"
+        class="epic-table scrum-table"
+      >
+        <el-table-column label="Scrum" width="96">
+          <template #default="scope">
+            <el-switch :model-value="isSelected(scope.row)" @change="(value: boolean) => setSelected(scope.row, value)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="Task" min-width="260" show-overflow-tooltip>
+          <template #default="scope">
+            <div class="scrum-epic-cell">
+              <strong>{{ scope.row.title }}</strong>
+              <span>{{ triggerDisplay(scope.row, eventsById()) }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="Priority" width="110">
+          <template #default="scope">
+            <el-tag effect="dark" :type="priorityTagType(priorityLabel(scope.row))">{{ priorityLabel(scope.row) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="Points" width="142">
+          <template #default="scope">
+            <el-select
+              :model-value="pointsFor(scope.row)"
+              size="small"
+              class="story-point-select"
+              @change="(value: number) => setPoints(scope.row, value)"
+            >
+              <el-option v-for="point in FIBONACCI_POINTS" :key="point" :label="String(point)" :value="point" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="Status" width="110">
+          <template #default="scope">
+            <el-tag effect="plain">{{ normalizeWorkflowStatus(scope.row).toUpperCase() }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="Due" width="120">
+          <template #default="scope">
+            {{ formatDate(scope.row.dueDateTime?.dateTime) || '-' }}
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="manageTasksVisible = false">Close</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="editDialogVisible" title="Edit Scrum Task" width="min(620px, 94vw)" class="scrum-task-dialog">
       <el-form label-position="top" class="scrum-inline-edit" @submit.prevent>
