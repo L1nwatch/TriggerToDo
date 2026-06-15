@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import TaskForm from '../components/TaskForm.vue'
 import {
   completeScrum,
@@ -353,6 +353,30 @@ function selectedPayload() {
   }))
 }
 
+function activeScrumItemPayloads() {
+  return (activeScrum.value?.items || []).map((item) => ({
+    list_id: item.list_id,
+    task_id: item.task_id,
+    points: item.points,
+    status: item.status,
+  }))
+}
+
+async function replaceActiveScrumItems(
+  items: Array<{ list_id: string; task_id: string; points: number; status?: ScrumStatus }>,
+  message: string,
+) {
+  if (!activeScrum.value) return
+  const targetPoints = items.reduce((sum, item) => sum + item.points, 0)
+  activeScrum.value = await updateScrum(activeScrum.value.id, {
+    target_points: targetPoints,
+    items,
+  })
+  selectedTaskKeys.value = []
+  await loadScrum()
+  ElMessage.success(message)
+}
+
 async function createOrUpdateScrum() {
   if (!draft.name.trim()) {
     ElMessage.warning('Scrum name is required')
@@ -417,6 +441,29 @@ async function moveItem(item: TriggerScrumItem, status: ScrumStatus) {
     ElMessage.error((error as Error).message || 'Failed to move task')
   } finally {
     movingItemId.value = null
+  }
+}
+
+async function addSelectedToActiveScrum() {
+  if (!activeScrum.value) return
+  if (!selectedTasks.value.length) {
+    ElMessage.warning('Select at least one task to add')
+    return
+  }
+
+  saving.value = true
+  try {
+    await replaceActiveScrumItems(
+      [
+        ...activeScrumItemPayloads(),
+        ...selectedPayload(),
+      ],
+      'Task added to scrum',
+    )
+  } catch (error) {
+    ElMessage.error((error as Error).message || 'Failed to add tasks to scrum')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -488,17 +535,40 @@ async function submitItemEdit() {
       points: scrumItem.id === item.id ? points : scrumItem.points,
       status: scrumItem.id === item.id ? editStatus.value : scrumItem.status,
     }))
-    const targetPoints = items.reduce((sum, scrumItem) => sum + scrumItem.points, 0)
-    activeScrum.value = await updateScrum(activeScrum.value.id, {
-      target_points: targetPoints,
-      items,
+    editDialogVisible.value = false
+    editingItem.value = null
+    await replaceActiveScrumItems(items, 'Scrum task updated')
+  } catch (error) {
+    ElMessage.error((error as Error).message || 'Failed to update scrum task')
+  } finally {
+    editSaving.value = false
+  }
+}
+
+async function removeEditingItemFromScrum() {
+  if (!activeScrum.value || !editingItem.value) return
+  try {
+    await ElMessageBox.confirm('Remove this task from the active scrum?', 'Move Out of Scrum', {
+      confirmButtonText: 'Remove',
+      cancelButtonText: 'Cancel',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+
+  editSaving.value = true
+  try {
+    const itemId = editingItem.value.id
+    const items = activeScrumItemPayloads().filter((item) => {
+      const current = activeScrum.value?.items.find((scrumItem) => scrumItem.id === itemId)
+      return !(current && item.list_id === current.list_id && item.task_id === current.task_id)
     })
     editDialogVisible.value = false
     editingItem.value = null
-    await loadScrum()
-    ElMessage.success('Scrum task updated')
+    await replaceActiveScrumItems(items, 'Task removed from scrum')
   } catch (error) {
-    ElMessage.error((error as Error).message || 'Failed to update scrum task')
+    ElMessage.error((error as Error).message || 'Failed to remove task from scrum')
   } finally {
     editSaving.value = false
   }
@@ -650,6 +720,63 @@ onBeforeUnmount(clearCardClickTimer)
         </article>
       </div>
     </section>
+      <el-card class="settings-block scrum-table-card" v-loading="loading">
+        <template #header>
+          <div class="epic-table-header">
+            <strong>Triggered task backlog</strong>
+            <span>{{ selectedTasks.length }} selected</span>
+          </div>
+          <div class="scrum-button-row">
+            <el-button @click="selectAllTriggered">Select Triggered</el-button>
+            <el-button @click="clearSelected">Clear</el-button>
+            <el-button type="primary" :loading="saving" :disabled="!selectedTasks.length" @click="addSelectedToActiveScrum">
+              Add Selected
+            </el-button>
+          </div>
+        </template>
+        <el-table :data="candidateTasks" row-key="id" empty-text="No unplanned triggered tasks found" class="epic-table scrum-table">
+          <el-table-column label="Scrum" width="96">
+            <template #default="scope">
+              <el-switch :model-value="isSelected(scope.row)" @change="(value: boolean) => setSelected(scope.row, value)" />
+            </template>
+          </el-table-column>
+          <el-table-column label="Task" min-width="260" show-overflow-tooltip>
+            <template #default="scope">
+              <div class="scrum-epic-cell">
+                <strong>{{ scope.row.title }}</strong>
+                <span>{{ triggerDisplay(scope.row, eventsById()) }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="Priority" width="110">
+            <template #default="scope">
+              <el-tag effect="dark" :type="priorityTagType(priorityLabel(scope.row))">{{ priorityLabel(scope.row) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="Points" width="142">
+            <template #default="scope">
+              <el-select
+                :model-value="pointsFor(scope.row)"
+                size="small"
+                class="story-point-select"
+                @change="(value: number) => setPoints(scope.row, value)"
+              >
+                <el-option v-for="point in FIBONACCI_POINTS" :key="point" :label="String(point)" :value="point" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="Status" width="110">
+            <template #default="scope">
+              <el-tag effect="plain">{{ normalizeWorkflowStatus(scope.row).toUpperCase() }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="Due" width="120">
+            <template #default="scope">
+              {{ formatDate(scope.row.dueDateTime?.dateTime) || '-' }}
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
     </template>
 
     <template v-else>
@@ -851,6 +978,7 @@ onBeforeUnmount(clearCardClickTimer)
         :epic-options="epicOptions"
       />
       <template #footer>
+        <el-button type="danger" plain :loading="editSaving" @click="removeEditingItemFromScrum">Remove from Scrum</el-button>
         <el-button @click="editDialogVisible = false">Cancel</el-button>
         <el-button type="primary" :loading="editSaving" @click="submitItemEdit">Save</el-button>
       </template>
