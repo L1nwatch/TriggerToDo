@@ -59,6 +59,42 @@ def test_update_milestone_replaces_links(db_session) -> None:
     assert updated["task_ids"] == []
 
 
+def test_create_milestone_does_not_link_done_epic(db_session) -> None:
+    db_session.add(TriggerEpic(epic_key="EPIC-1", name="Completed", status="Done", priority="P1"))
+    db_session.add(TriggerEpic(epic_key="EPIC-2", name="Active", status="Open", priority="P2"))
+    db_session.commit()
+
+    created = create_milestone(
+        TriggerMilestoneCreate(title="Checkpoint", epic_keys=["EPIC-1", "EPIC-2"]),
+        request=None,
+        db=db_session,
+    )
+
+    assert created["epic_keys"] == ["EPIC-2"]
+    assert created["summary"]["epics"] == 1
+
+
+def test_update_milestone_does_not_link_done_epic(db_session) -> None:
+    db_session.add(TriggerEpic(epic_key="EPIC-1", name="Completed", status="Done", priority="P1"))
+    db_session.add(TriggerEpic(epic_key="EPIC-2", name="Active", status="Open", priority="P2"))
+    db_session.commit()
+    created = create_milestone(
+        TriggerMilestoneCreate(title="Draft", epic_keys=["EPIC-2"]),
+        request=None,
+        db=db_session,
+    )
+
+    updated = update_milestone(
+        created["id"],
+        TriggerMilestoneUpdate(epic_keys=["EPIC-1"]),
+        request=None,
+        db=db_session,
+    )
+
+    assert updated["epic_keys"] == []
+    assert updated["summary"]["epics"] == 0
+
+
 def test_delete_milestone_removes_row(db_session) -> None:
     created = create_milestone(TriggerMilestoneCreate(title="Temporary"), request=None, db=db_session)
 

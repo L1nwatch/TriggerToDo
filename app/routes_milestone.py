@@ -16,17 +16,43 @@ def _clean_epic_key(value: str) -> str:
     return _clean_ref(value).upper()
 
 
+def _is_completed_epic_status(status: str | None) -> bool:
+    value = str(status or "").lower()
+    return any(marker in value for marker in ("done", "closed", "resolved", "complete"))
+
+
+def _active_epic_keys(db: Session, values: list[str]) -> list[str]:
+    clean_values = []
+    for value in values:
+        clean = _clean_epic_key(value)
+        if clean and clean not in clean_values:
+            clean_values.append(clean)
+    if not clean_values:
+        return []
+
+    rows = db.query(TriggerEpic).filter(TriggerEpic.epic_key.in_(clean_values)).all()
+    epics_by_key = {row.epic_key: row for row in rows}
+    return [
+        key
+        for key in clean_values
+        if not (key in epics_by_key and _is_completed_epic_status(epics_by_key[key].status))
+    ]
+
+
 def _replace_links(db: Session, milestone_id: int, link_type: str, values: list[str]) -> None:
     db.query(TriggerMilestoneLink).filter(
         TriggerMilestoneLink.milestone_id == milestone_id,
         TriggerMilestoneLink.link_type == link_type,
     ).delete()
 
-    clean_values = []
-    for value in values:
-        clean = _clean_epic_key(value) if link_type == "epic" else _clean_ref(value)
-        if clean and clean not in clean_values:
-            clean_values.append(clean)
+    if link_type == "epic":
+        clean_values = _active_epic_keys(db, values)
+    else:
+        clean_values = []
+        for value in values:
+            clean = _clean_ref(value)
+            if clean and clean not in clean_values:
+                clean_values.append(clean)
 
     for ref_id in clean_values:
         db.add(TriggerMilestoneLink(milestone_id=milestone_id, link_type=link_type, ref_id=ref_id))

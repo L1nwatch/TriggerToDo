@@ -59,6 +59,11 @@ const totals = computed(() => {
   }
 })
 
+function isCompletedStatus(status?: string) {
+  const value = (status || '').toLowerCase()
+  return value.includes('done') || value.includes('closed') || value.includes('resolved') || value.includes('complete')
+}
+
 function resetForm() {
   form.id = null
   form.title = ''
@@ -112,10 +117,12 @@ async function loadData() {
       queryCachedTasks(),
     ])
     milestones.value = milestonesData.items
-    epicOptions.value = epicsData.items.map((epic) => ({
-      value: epic.epic_key,
-      label: `${epic.epic_key} - ${epic.name || 'Unnamed Epic'}`,
-    }))
+    epicOptions.value = epicsData.items
+      .filter((epic) => !isCompletedStatus(epic.status))
+      .map((epic) => ({
+        value: epic.epic_key,
+        label: `${epic.epic_key} - ${epic.name || 'Unnamed Epic'}`,
+      }))
     taskOptions.value = tasksData.items
       .filter((task) => task.status !== 'completed')
       .map((task) => ({
