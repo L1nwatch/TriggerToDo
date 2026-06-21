@@ -52,16 +52,23 @@ const editPoints = ref(1)
 const editStatus = ref<ScrumStatus>('todo')
 let cardClickTimer: number | null = null
 
+function toLocalDateInputValue(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const today = new Date()
-const twoWeeks = new Date(today)
-twoWeeks.setDate(today.getDate() + 13)
+const oneWeekFromToday = new Date(today)
+oneWeekFromToday.setDate(today.getDate() + 7)
 const DOUBLE_TAP_MS = 360
 
 const draft = reactive({
   name: 'Current Sprint',
   goal: '',
-  startDate: today.toISOString().slice(0, 10),
-  endDate: twoWeeks.toISOString().slice(0, 10),
+  startDate: toLocalDateInputValue(today),
+  endDate: toLocalDateInputValue(oneWeekFromToday),
 })
 
 const triggerOptions = computed(() => [
