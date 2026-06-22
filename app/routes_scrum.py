@@ -231,6 +231,7 @@ def create_scrum(payload: TriggerScrumCreate, request: Request, db: Session = De
     db.add(row)
     db.flush()
     _replace_items(db, row, payload.items, mark_new_after_start=False)
+    row.target_points = sum(_points(item.points) for item in payload.items)
     db.commit()
     db.refresh(row)
     return _serialize(row, db)
@@ -266,6 +267,7 @@ def update_scrum(scrum_id: int, payload: TriggerScrumUpdate, request: Request, d
             row.completed_at = datetime.now(timezone.utc)
     if payload.items is not None:
         _replace_items(db, row, payload.items)
+        row.target_points = sum(_points(item.points) for item in payload.items)
 
     db.commit()
     db.refresh(row)

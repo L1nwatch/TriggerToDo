@@ -66,7 +66,6 @@ const DOUBLE_TAP_MS = 360
 
 const draft = reactive({
   name: 'Current Sprint',
-  goal: '',
   startDate: toLocalDateInputValue(today),
   endDate: toLocalDateInputValue(oneWeekFromToday),
 })
@@ -347,7 +346,6 @@ function clearSelected() {
 
 function applyScrumToDraft(scrum: TriggerScrum) {
   draft.name = scrum.name
-  draft.goal = scrum.goal || ''
   draft.startDate = scrum.start_date || draft.startDate
   draft.endDate = scrum.end_date || draft.endDate
 }
@@ -404,10 +402,8 @@ async function createOrUpdateScrum() {
     if (activeScrum.value) {
       activeScrum.value = await updateScrum(activeScrum.value.id, {
         name: draft.name.trim(),
-        goal: draft.goal || null,
         start_date: draft.startDate,
         end_date: draft.endDate,
-        target_points: activeScrum.value.summary.points + selectedPoints.value,
         items: [
           ...activeScrum.value.items.map((item) => ({
             list_id: item.list_id,
@@ -422,10 +418,8 @@ async function createOrUpdateScrum() {
     } else {
       activeScrum.value = await createScrum({
         name: draft.name.trim(),
-        goal: draft.goal || null,
         start_date: draft.startDate,
         end_date: draft.endDate,
-        target_points: selectedPoints.value,
         status: 'active',
         items: selectedPayload(),
       })
@@ -744,9 +738,6 @@ onBeforeUnmount(clearCardClickTimer)
               </el-form-item>
               <el-form-item label="End">
                 <el-input v-model="draft.endDate" type="date" />
-              </el-form-item>
-              <el-form-item label="Goal">
-                <el-input v-model="draft.goal" placeholder="Sprint goal" clearable />
               </el-form-item>
               <el-form-item label="Tasks">
                 <div class="scrum-button-row">
