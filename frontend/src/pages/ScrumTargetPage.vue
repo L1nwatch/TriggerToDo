@@ -674,7 +674,6 @@ onBeforeUnmount(clearCardClickTimer)
       <div class="scrum-board-head">
         <strong>{{ activeScrum.name }}</strong>
         <div class="scrum-button-row">
-          <el-tag effect="dark" type="success">Active</el-tag>
           <el-button plain @click="manageTasksVisible = true">Manage Tasks</el-button>
           <el-button type="danger" plain :loading="saving" @click="completeActiveScrum">Complete Scrum</el-button>
         </div>
