@@ -43,6 +43,10 @@ function routineCellKey(task: TodoTask, checkDate: string) {
   return routineCheckKey(task.listId, task.id, checkDate)
 }
 
+function normalizedRoutineTitle(task: TodoTask) {
+  return task.title.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
 function extension(task?: TodoTask) {
   return task?.extensions?.find((item) => item.extensionName === 'com.triggertodo.meta')
 }
@@ -72,6 +76,21 @@ function isRoutineTask(task: TodoTask) {
   return routineFrequency(task) !== null
 }
 
+function routineIdentity(task: TodoTask) {
+  const ref = String(extension(task)?.triggerRef || '').toLowerCase()
+  const recurrence = recurrenceType(task)
+  return [
+    task.listId,
+    routineFrequency(task) || 'Routine',
+    ref || recurrence || 'routine',
+    normalizedRoutineTitle(task),
+  ].join(':')
+}
+
+function completedRoutineKey(identity: string, checkDate: string) {
+  return `${identity}:${checkDate}`
+}
+
 function dueTime(task: TodoTask) {
   const value = task.dueDateTime?.dateTime
   if (!value) return Number.POSITIVE_INFINITY
@@ -94,6 +113,14 @@ function routineDueLabel(task: TodoTask) {
   const due = dueTime(task)
   if (!Number.isFinite(due)) return 'No due date'
   return due <= Date.now() ? 'Due' : 'Upcoming'
+}
+
+function dueDateKey(task: TodoTask) {
+  const value = task.dueDateTime?.dateTime
+  if (!value) return null
+  const at = new Date(value)
+  if (Number.isNaN(at.getTime())) return null
+  return toLocalDateInputValue(at)
 }
 
 function formatDate(value?: string | null) {
@@ -136,24 +163,48 @@ const routineTasks = computed(() =>
       return a.title.localeCompare(b.title)
     }),
 )
+const completedRoutineChecks = computed(() => {
+  const checks = new Set<string>()
+  for (const task of tasks.value) {
+    if (!isCompletedStatus(task.status) || !isRoutineTask(task)) continue
+    const completedDate = dueDateKey(task)
+    if (!completedDate) continue
+    const frequency = routineFrequency(task)
+    if (frequency === 'Daily') {
+      checks.add(completedRoutineKey(routineIdentity(task), completedDate))
+    } else if (completedDate >= routineWeekStart.value && completedDate <= routineWeekEnd.value) {
+      checks.add(completedRoutineKey(routineIdentity(task), routineWeekStart.value))
+    }
+  }
+  return checks
+})
 const dueRoutineCount = computed(() => routineTasks.value.filter((task) => routineDueLabel(task) === 'Due').length)
 const dailyRoutineCount = computed(() => routineTasks.value.filter((task) => routineFrequency(task) === 'Daily').length)
 const weeklyRoutineCount = computed(() => routineTasks.value.filter((task) => routineFrequency(task) === 'Weekly').length)
-const visibleRoutineCheckKeys = computed(() => {
-  const keys = new Set<string>()
+const checkedRoutineCount = computed(() => {
+  let count = 0
   for (const task of routineTasks.value) {
     if (routineFrequency(task) === 'Weekly') {
-      keys.add(routineCellKey(task, routineWeekStart.value))
+      if (isRoutineChecked(task, routineWeekStart.value)) count += 1
     } else {
-      for (const day of routineWeekDays.value) keys.add(routineCellKey(task, day.date))
+      for (const day of routineWeekDays.value) {
+        if (isRoutineChecked(task, day.date)) count += 1
+      }
     }
   }
-  return keys
+  return count
 })
-const checkedRoutineCount = computed(() => [...routineChecks.value].filter((key) => visibleRoutineCheckKeys.value.has(key)).length)
 
 function isRoutineChecked(task: TodoTask, checkDate: string) {
-  return routineChecks.value.has(routineCellKey(task, checkDate))
+  return routineChecks.value.has(routineCellKey(task, checkDate)) || completedRoutineChecks.value.has(completedRoutineKey(routineIdentity(task), checkDate))
+}
+
+function isRoutineCompletedFromTriggerSet(task: TodoTask, checkDate: string) {
+  return completedRoutineChecks.value.has(completedRoutineKey(routineIdentity(task), checkDate))
+}
+
+function routineCheckDateForCell(task: TodoTask, day: { date: string }) {
+  return routineFrequency(task) === 'Weekly' ? routineWeekStart.value : day.date
 }
 
 async function setRoutineChecked(task: TodoTask, checkDate: string, checked: boolean) {
@@ -280,9 +331,12 @@ onMounted(loadRoutineTracker)
           <template #default="scope">
             <el-checkbox
               v-if="routineFrequency(scope.row) === 'Daily' || day.index === 0"
-              :model-value="isRoutineChecked(scope.row, routineFrequency(scope.row) === 'Weekly' ? routineWeekStart : day.date)"
-              :disabled="checkingRoutineCell === routineCellKey(scope.row, routineFrequency(scope.row) === 'Weekly' ? routineWeekStart : day.date)"
-              @change="(value: boolean) => setRoutineChecked(scope.row, routineFrequency(scope.row) === 'Weekly' ? routineWeekStart : day.date, value)"
+              :model-value="isRoutineChecked(scope.row, routineCheckDateForCell(scope.row, day))"
+              :disabled="
+                checkingRoutineCell === routineCellKey(scope.row, routineCheckDateForCell(scope.row, day)) ||
+                isRoutineCompletedFromTriggerSet(scope.row, routineCheckDateForCell(scope.row, day))
+              "
+              @change="(value: boolean) => setRoutineChecked(scope.row, routineCheckDateForCell(scope.row, day), value)"
             >
               {{ routineFrequency(scope.row) === 'Weekly' ? 'Week' : '' }}
             </el-checkbox>
