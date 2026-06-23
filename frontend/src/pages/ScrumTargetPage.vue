@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import TaskForm from '../components/TaskForm.vue'
 import {
+  completeTask,
   completeScrum,
   createScrum,
   fetchAllTasks,
@@ -32,6 +33,7 @@ const columns: Array<{ status: ScrumStatus; label: string }> = [
 const loading = ref(false)
 const saving = ref(false)
 const editSaving = ref(false)
+const completingRoutineKey = ref<string | null>(null)
 const movingItemId = ref<number | null>(null)
 const draggingItemId = ref<number | null>(null)
 const lastTappedItem = ref<{ id: number; at: number } | null>(null)
@@ -99,6 +101,52 @@ function isCompletedStatus(status?: string | null) {
   return value.includes('done') || value.includes('closed') || value.includes('resolved') || value.includes('complete')
 }
 
+function recurrenceType(task: TodoTask) {
+  return String(task.recurrence?.pattern?.type || '').toLowerCase()
+}
+
+function routineFrequency(task: TodoTask): 'Daily' | 'Weekly' | null {
+  const ref = String(extension(task)?.triggerRef || '').toLowerCase()
+  const type = recurrenceType(task)
+  if (ref === 'date:daily' || type === 'daily') return 'Daily'
+  if (ref === 'date:weekly' || type === 'weekly' || type === 'relativeweekly') return 'Weekly'
+  return null
+}
+
+function isRoutineTask(task: TodoTask) {
+  return routineFrequency(task) !== null
+}
+
+function dueTime(task: TodoTask) {
+  const value = task.dueDateTime?.dateTime
+  if (!value) return Number.POSITIVE_INFINITY
+  const time = Date.parse(value)
+  return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time
+}
+
+function compareDueTime(a: TodoTask, b: TodoTask) {
+  const aDue = dueTime(a)
+  const bDue = dueTime(b)
+  const aHasDue = Number.isFinite(aDue)
+  const bHasDue = Number.isFinite(bDue)
+  if (aHasDue && bHasDue) return aDue - bDue
+  if (aHasDue) return -1
+  if (bHasDue) return 1
+  return 0
+}
+
+function routineDueLabel(task: TodoTask) {
+  const due = dueTime(task)
+  if (!Number.isFinite(due)) return 'No due date'
+  return due <= Date.now() ? 'Due' : 'Upcoming'
+}
+
+function routineDueType(task: TodoTask) {
+  const due = dueTime(task)
+  if (!Number.isFinite(due)) return 'info'
+  return due <= Date.now() ? 'warning' : 'success'
+}
+
 function normalizeWorkflowStatus(task: TodoTask): ScrumStatus {
   const value = String(extension(task)?.wfStatus || '').toLowerCase()
   return value === 'doing' ? 'doing' : 'todo'
@@ -161,6 +209,7 @@ const candidateTasks = computed(() => {
   const eventMap = eventsById()
   return tasks.value
     .filter((task) => !isCompletedStatus(task.status))
+    .filter((task) => !isRoutineTask(task))
     .filter((task) => hasAnyTriggerConfigured(task) && isTaskTriggered(task, eventMap))
     .filter((task) => !activeItemKeys.value.has(taskKey(task)))
     .sort((a, b) => {
@@ -170,6 +219,21 @@ const candidateTasks = computed(() => {
     })
 })
 
+const routineTasks = computed(() =>
+  tasks.value
+    .filter((task) => !isCompletedStatus(task.status))
+    .filter(isRoutineTask)
+    .sort((a, b) => {
+      const dueDiff = compareDueTime(a, b)
+      if (dueDiff !== 0) return dueDiff
+      const frequencyDiff = String(routineFrequency(a)).localeCompare(String(routineFrequency(b)))
+      if (frequencyDiff !== 0) return frequencyDiff
+      return a.title.localeCompare(b.title)
+    }),
+)
+const dueRoutineCount = computed(() => routineTasks.value.filter((task) => routineDueLabel(task) === 'Due').length)
+const dailyRoutineCount = computed(() => routineTasks.value.filter((task) => routineFrequency(task) === 'Daily').length)
+const weeklyRoutineCount = computed(() => routineTasks.value.filter((task) => routineFrequency(task) === 'Weekly').length)
 const selectedTasks = computed(() => candidateTasks.value.filter((task) => selectedTaskKeys.value.includes(taskKey(task))))
 const selectedPoints = computed(() => selectedTasks.value.reduce((sum, task) => sum + pointsFor(task), 0))
 const sprintPoints = computed(() => activeScrum.value?.summary.points || 0)
@@ -589,6 +653,20 @@ async function completeActiveScrum() {
   }
 }
 
+async function completeRoutine(task: TodoTask) {
+  const key = taskKey(task)
+  completingRoutineKey.value = key
+  try {
+    await completeTask(task.listId, task.id)
+    await loadScrum()
+    ElMessage.success('Routine checked')
+  } catch (error) {
+    ElMessage.error((error as Error).message || 'Failed to check routine')
+  } finally {
+    completingRoutineKey.value = null
+  }
+}
+
 async function loadScrum() {
   loading.value = true
   try {
@@ -639,6 +717,63 @@ onBeforeUnmount(clearCardClickTimer)
         </p>
       </div>
     </header>
+
+    <section class="routine-checker-panel" v-loading="loading">
+      <div class="routine-checker-head">
+        <div>
+          <strong>Routine checker</strong>
+          <span>Daily and weekly tasks are tracked here, outside scrum story points.</span>
+        </div>
+        <div class="routine-metrics">
+          <el-tag type="warning" effect="plain">{{ dueRoutineCount }} due</el-tag>
+          <el-tag type="success" effect="plain">{{ dailyRoutineCount }} daily</el-tag>
+          <el-tag type="info" effect="plain">{{ weeklyRoutineCount }} weekly</el-tag>
+        </div>
+      </div>
+      <el-table
+        :data="routineTasks"
+        row-key="id"
+        empty-text="No daily or weekly routines found"
+        class="epic-table routine-table"
+      >
+        <el-table-column label="Routine" min-width="260" show-overflow-tooltip>
+          <template #default="scope">
+            <div class="scrum-epic-cell">
+              <strong>{{ scope.row.title }}</strong>
+              <span>{{ triggerDisplay(scope.row, eventsById()) }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="Cadence" width="112">
+          <template #default="scope">
+            <el-tag effect="plain">{{ routineFrequency(scope.row) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="Due" width="132">
+          <template #default="scope">
+            {{ formatDate(scope.row.dueDateTime?.dateTime) || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="State" width="112">
+          <template #default="scope">
+            <el-tag effect="plain" :type="routineDueType(scope.row)">{{ routineDueLabel(scope.row) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="" width="112" align="right">
+          <template #default="scope">
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :loading="completingRoutineKey === taskKey(scope.row)"
+              @click="completeRoutine(scope.row)"
+            >
+              Done
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </section>
 
     <template v-if="activeScrum && activeScrum.status === 'active'">
       <section class="scrum-active-summary">

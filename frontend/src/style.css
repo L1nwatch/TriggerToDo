@@ -817,6 +817,45 @@ body {
   margin: 8px 0 0;
 }
 
+.routine-checker-panel {
+  border: 1px solid color-mix(in srgb, var(--line) 78%, #e2e8df 22%);
+  border-radius: 12px;
+  background: #fffdfa;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.routine-checker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.routine-checker-head > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.routine-checker-head span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.routine-metrics {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.routine-table {
+  max-width: 100%;
+  min-width: 0;
+}
+
 .scrum-history-panel {
   border: 1px solid #dfe1e6;
   border-radius: 6px;
