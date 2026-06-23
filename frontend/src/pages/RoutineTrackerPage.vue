@@ -164,8 +164,8 @@ const routineWeekDays = computed(() => {
     return {
       index,
       date: toLocalDateInputValue(date),
-      label: `Day ${index + 1}`,
-      shortDate: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      label: date.toLocaleDateString(undefined, { weekday: 'long' }),
+      shortDate: toLocalDateInputValue(date),
     }
   })
 })
