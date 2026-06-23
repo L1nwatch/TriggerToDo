@@ -116,11 +116,18 @@ function routineDueLabel(task: TodoTask) {
 }
 
 function dueDateKey(task: TodoTask) {
-  const value = task.dueDateTime?.dateTime
+  return dateKeyFromValue(task.dueDateTime?.dateTime)
+}
+
+function dateKeyFromValue(value?: string | null) {
   if (!value) return null
   const at = new Date(value)
   if (Number.isNaN(at.getTime())) return null
   return toLocalDateInputValue(at)
+}
+
+function completionDateKey(task: TodoTask) {
+  return dateKeyFromValue(task.lastModifiedDateTime) || dueDateKey(task)
 }
 
 function formatDate(value?: string | null) {
@@ -167,13 +174,33 @@ const completedRoutineChecks = computed(() => {
   const checks = new Set<string>()
   for (const task of tasks.value) {
     if (!isCompletedStatus(task.status) || !isRoutineTask(task)) continue
-    const completedDate = dueDateKey(task)
+    const completedDate = completionDateKey(task)
     if (!completedDate) continue
     const frequency = routineFrequency(task)
     if (frequency === 'Daily') {
       checks.add(completedRoutineKey(routineIdentity(task), completedDate))
     } else if (completedDate >= routineWeekStart.value && completedDate <= routineWeekEnd.value) {
       checks.add(completedRoutineKey(routineIdentity(task), routineWeekStart.value))
+    }
+  }
+  return checks
+})
+const nextInstanceRoutineChecks = computed(() => {
+  const checks = new Set<string>()
+  for (const task of routineTasks.value) {
+    const dueDate = dueDateKey(task)
+    if (!dueDate) continue
+    const frequency = routineFrequency(task)
+    if (frequency === 'Daily') {
+      const previousDate = toLocalDateInputValue(addDays(dateFromLocalInput(dueDate), -1))
+      if (previousDate >= routineWeekStart.value && previousDate <= routineWeekEnd.value) {
+        checks.add(completedRoutineKey(routineIdentity(task), previousDate))
+      }
+    } else if (frequency === 'Weekly') {
+      const previousDate = toLocalDateInputValue(addDays(dateFromLocalInput(dueDate), -7))
+      if (previousDate >= routineWeekStart.value && previousDate <= routineWeekEnd.value) {
+        checks.add(completedRoutineKey(routineIdentity(task), routineWeekStart.value))
+      }
     }
   }
   return checks
@@ -196,11 +223,13 @@ const checkedRoutineCount = computed(() => {
 })
 
 function isRoutineChecked(task: TodoTask, checkDate: string) {
-  return routineChecks.value.has(routineCellKey(task, checkDate)) || completedRoutineChecks.value.has(completedRoutineKey(routineIdentity(task), checkDate))
+  const syncedKey = completedRoutineKey(routineIdentity(task), checkDate)
+  return routineChecks.value.has(routineCellKey(task, checkDate)) || completedRoutineChecks.value.has(syncedKey) || nextInstanceRoutineChecks.value.has(syncedKey)
 }
 
 function isRoutineCompletedFromTriggerSet(task: TodoTask, checkDate: string) {
-  return completedRoutineChecks.value.has(completedRoutineKey(routineIdentity(task), checkDate))
+  const syncedKey = completedRoutineKey(routineIdentity(task), checkDate)
+  return completedRoutineChecks.value.has(syncedKey) || nextInstanceRoutineChecks.value.has(syncedKey)
 }
 
 function routineCheckDateForCell(task: TodoTask, day: { date: string }) {
