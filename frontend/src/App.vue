@@ -16,6 +16,7 @@ const sidebarCounts = reactive({
 const activePath = computed(() => {
   if (route.path.startsWith('/epics/scrum')) return '/epics/scrum'
   if (route.path.startsWith('/epics')) return '/epics'
+  if (route.path.startsWith('/routines')) return '/routines'
   if (route.path.startsWith('/milestones')) return '/milestones'
   if (route.path.startsWith('/events')) return '/events'
   if (route.path.startsWith('/triggers') || route.path.startsWith('/settings')) return '/triggers'
@@ -76,6 +77,7 @@ watch(
           </span>
         </el-menu-item>
         <el-menu-item index="/epics/scrum">Scrum Target</el-menu-item>
+        <el-menu-item index="/routines">Routine Tracker</el-menu-item>
         <el-menu-item index="/milestones">
           <span class="menu-item-row">
             <span>Milestones</span>
