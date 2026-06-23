@@ -1,4 +1,4 @@
-import type { TodoList, TodoTask, TriggerEvent, TriggerMilestone, TriggerRule, TriggerRuleWithMonitor, TriggerScrum } from './types'
+import type { TodoList, TodoTask, TriggerEvent, TriggerMilestone, TriggerRoutineCheck, TriggerRule, TriggerRuleWithMonitor, TriggerScrum } from './types'
 import { isOnOrAfterBoardCutoff } from './boardCutoff'
 
 const JSON_HEADERS = {
@@ -366,6 +366,26 @@ export async function updateScrumItemStatus(scrumId: number, itemId: number, sta
   return request<TriggerScrum>(`/api/scrums/${scrumId}/items/${itemId}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  })
+}
+
+export async function listRoutineChecks(startDate: string, endDate: string) {
+  const search = new URLSearchParams({ start_date: startDate, end_date: endDate })
+  return request<{
+    count: number
+    items: TriggerRoutineCheck[]
+  }>(`/api/routines/checks?${search.toString()}`)
+}
+
+export async function setRoutineCheck(payload: {
+  list_id: string
+  task_id: string
+  check_date: string
+  checked: boolean
+}) {
+  return request<TriggerRoutineCheck | { ok: boolean }>('/api/routines/checks', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
   })
 }
 

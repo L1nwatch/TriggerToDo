@@ -856,6 +856,34 @@ body {
   min-width: 0;
 }
 
+.routine-sheet .el-table__cell {
+  vertical-align: middle;
+}
+
+.routine-day-head {
+  display: grid;
+  gap: 2px;
+  line-height: 1.15;
+}
+
+.routine-day-head span,
+.routine-empty-cell {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.routine-sheet .el-checkbox {
+  --el-checkbox-input-height: 18px;
+  --el-checkbox-input-width: 18px;
+  height: auto;
+  justify-content: center;
+}
+
+.routine-sheet .el-checkbox__label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .scrum-history-panel {
   border: 1px solid #dfe1e6;
   border-radius: 6px;

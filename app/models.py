@@ -165,6 +165,18 @@ class TriggerScrumItem(Base):
     __table_args__ = (Index("ix_trigger_scrum_item_unique", "scrum_id", "graph_list_id", "graph_task_id", unique=True),)
 
 
+class TriggerRoutineCheck(Base):
+    __tablename__ = "trigger_routine_check"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    graph_list_id: Mapped[str] = mapped_column(String(128), index=True)
+    graph_task_id: Mapped[str] = mapped_column(String(128), index=True)
+    check_date: Mapped[str] = mapped_column(String(10), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (Index("ix_trigger_routine_check_unique", "graph_list_id", "graph_task_id", "check_date", unique=True),)
+
+
 class JiraIssueOverride(Base):
     __tablename__ = "jira_issue_override"
 

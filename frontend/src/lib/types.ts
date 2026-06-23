@@ -153,3 +153,11 @@ export interface TriggerScrum {
   }
   items: TriggerScrumItem[]
 }
+
+export interface TriggerRoutineCheck {
+  id: number
+  list_id: string
+  task_id: string
+  check_date: string
+  updated_at: string
+}

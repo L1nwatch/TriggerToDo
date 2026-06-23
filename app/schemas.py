@@ -136,3 +136,10 @@ class TriggerScrumUpdate(BaseModel):
 
 class TriggerScrumItemStatusUpdate(BaseModel):
     status: str
+
+
+class TriggerRoutineCheckUpdate(BaseModel):
+    list_id: str
+    task_id: str
+    check_date: str
+    checked: bool = True
