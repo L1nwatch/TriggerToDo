@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { fetchAllTasks, listRoutineChecks, listTriggerEvents, setRoutineCheck } from '../lib/api'
+import { completeTask, fetchAllTasks, listRoutineChecks, listTriggerEvents, setRoutineCheck } from '../lib/api'
 import { triggerDisplay } from '../lib/triggerSignal'
 import type { TodoTask, TriggerEvent } from '../lib/types'
 
@@ -130,6 +130,20 @@ function completionDateKey(task: TodoTask) {
   return dateKeyFromValue(task.lastModifiedDateTime) || dueDateKey(task)
 }
 
+function isDueInVisibleWeek(task: TodoTask) {
+  const dueDate = dueDateKey(task)
+  return Boolean(dueDate && dueDate >= routineWeekStart.value && dueDate <= routineWeekEnd.value)
+}
+
+function shouldCompleteTaskFromCell(task: TodoTask, checkDate: string) {
+  if (isCompletedStatus(task.status)) return false
+  const frequency = routineFrequency(task)
+  const dueDate = dueDateKey(task)
+  if (frequency === 'Daily') return checkDate === toLocalDateInputValue(new Date()) || checkDate === dueDate
+  if (frequency === 'Weekly') return checkDate === routineWeekStart.value && isDueInVisibleWeek(task)
+  return false
+}
+
 function formatDate(value?: string | null) {
   if (!value) return ''
   const at = new Date(value)
@@ -240,6 +254,13 @@ async function setRoutineChecked(task: TodoTask, checkDate: string, checked: boo
   const key = routineCellKey(task, checkDate)
   checkingRoutineCell.value = key
   try {
+    if (checked && shouldCompleteTaskFromCell(task, checkDate)) {
+      await completeTask(task.listId, task.id)
+      await loadRoutineTracker()
+      ElMessage.success('Task completed')
+      return
+    }
+
     await setRoutineCheck({
       list_id: task.listId,
       task_id: task.id,
