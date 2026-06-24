@@ -3,7 +3,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, ref, watch } from 'vue'
 import { createTriggerEvent } from '../lib/api'
 import type { TodoList } from '../lib/types'
-import type { TaskFormModel } from '../lib/taskForm'
+import { userTimeZone, type TaskFormModel } from '../lib/taskForm'
 
 interface Props {
   model: TaskFormModel
@@ -31,6 +31,7 @@ const triggerType = ref<'none' | 'date' | 'event'>('none')
 const selectedDateTrigger = ref('date')
 const selectedEventTrigger = ref('')
 const showDateFields = computed(() => triggerType.value === 'date')
+const dueAtLabel = computed(() => `Due At (${userTimeZone()})`)
 const showDateInterval = computed(() => showDateFields.value && selectedDateTrigger.value !== 'date')
 const dateIntervalUnitLabel = computed(() => {
   if (selectedDateTrigger.value === 'date:daily') return 'day(s)'
@@ -332,7 +333,7 @@ watch(
 
     <el-row :gutter="12">
       <el-col v-if="showDateFields" :xs="24" :md="12">
-        <el-form-item label="Due At (UTC)">
+        <el-form-item :label="dueAtLabel">
           <el-input v-model="model.dueAt" type="datetime-local" />
         </el-form-item>
       </el-col>

@@ -26,6 +26,29 @@ export function defaultTaskForm(listId = ''): TaskFormModel {
   }
 }
 
+function toLocalDateTimeInputValue(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+function localDateInputValue(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export function userTimeZone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
+
 function getExtension(task: TodoTask, field: 'wfStatus' | 'triggerRef' | 'epicKey') {
   const ext = (task.extensions || []).find((item) => item.extensionName === 'com.triggertodo.meta')
   return ext?.[field] || ''
@@ -43,8 +66,7 @@ export function formFromTask(task: TodoTask): TaskFormModel {
   }
 
   if (task.dueDateTime?.dateTime) {
-    const normalized = task.dueDateTime.dateTime.slice(0, 16)
-    model.dueAt = normalized
+    model.dueAt = toLocalDateTimeInputValue(task.dueDateTime.dateTime)
   }
 
   const recurrenceType = String(task.recurrence?.pattern?.['type'] || '').toLowerCase()
@@ -75,14 +97,14 @@ export function taskPayloadFromForm(model: TaskFormModel, options?: { includeSou
   if (model.dueAt) {
     payload.dueDateTime = {
       dateTime: new Date(model.dueAt).toISOString(),
-      timeZone: 'UTC',
+      timeZone: userTimeZone(),
     }
   } else {
     payload.dueDateTime = null
   }
 
   if (model.recurrenceType !== 'none') {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localDateInputValue()
     payload.recurrence = {
       pattern: {
         type: model.recurrenceType,
