@@ -274,6 +274,7 @@ export async function createMilestone(payload: {
   notes?: string | null
   epic_keys?: string[]
   task_ids?: string[]
+  scrum_ids?: string[]
 }) {
   return request<TriggerMilestone>('/api/milestones', {
     method: 'POST',
@@ -290,6 +291,7 @@ export async function updateMilestone(
     notes?: string | null
     epic_keys?: string[]
     task_ids?: string[]
+    scrum_ids?: string[]
   },
 ) {
   return request<TriggerMilestone>(`/api/milestones/${milestoneId}`, {

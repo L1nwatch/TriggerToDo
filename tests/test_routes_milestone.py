@@ -1,10 +1,11 @@
-from app.models import TodoTaskCache, TriggerEpic
+from app.models import TodoTaskCache, TriggerEpic, TriggerScrum
 from app.routes_milestone import create_milestone, delete_milestone, list_milestones, update_milestone
 from app.schemas import TriggerMilestoneCreate, TriggerMilestoneUpdate
 
 
 def test_create_and_list_milestone_with_links(db_session) -> None:
     db_session.add(TriggerEpic(epic_key="EPIC-1", name="Launch", status="Open", priority="P1"))
+    db_session.add(TriggerScrum(id=7, name="Launch Sprint", status="active", start_date="2026-05-13", end_date="2026-05-20"))
     db_session.add(
         TodoTaskCache(
             graph_list_id="list-1",
@@ -21,19 +22,22 @@ def test_create_and_list_milestone_with_links(db_session) -> None:
         TriggerMilestoneCreate(
             title="Launch window",
             milestone_at="2026-05-20T09:00",
-            location="Toronto",
-            epic_keys=["epic-1"],
-            task_ids=["task-1"],
-        ),
+                location="Toronto",
+                epic_keys=["epic-1"],
+                task_ids=["task-1"],
+                scrum_ids=["7"],
+            ),
         request=None,
         db=db_session,
     )
 
     assert created["title"] == "Launch window"
     assert created["epic_keys"] == ["EPIC-1"]
-    assert created["summary"] == {"epics": 1, "tasks": 1}
+    assert created["scrum_ids"] == ["7"]
+    assert created["summary"] == {"epics": 1, "tasks": 1, "scrums": 1}
     assert created["epics"][0]["name"] == "Launch"
     assert created["tasks"][0]["title"] == "Prepare launch"
+    assert created["scrums"][0]["name"] == "Launch Sprint"
 
     listed = list_milestones(request=None, db=db_session)
     assert listed["count"] == 1

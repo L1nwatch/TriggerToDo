@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import TodoTaskCache, TriggerEpic, TriggerMilestone, TriggerMilestoneLink
+from app.models import TodoTaskCache, TriggerEpic, TriggerMilestone, TriggerMilestoneLink, TriggerScrum
 from app.schemas import TriggerMilestoneCreate, TriggerMilestoneUpdate
 
 router = APIRouter(prefix="/api/milestones", tags=["milestones"])
@@ -47,6 +47,12 @@ def _replace_links(db: Session, milestone_id: int, link_type: str, values: list[
 
     if link_type == "epic":
         clean_values = _active_epic_keys(db, values)
+    elif link_type == "scrum":
+        clean_values = []
+        for value in values:
+            clean = _clean_ref(value)
+            if clean.isdigit() and clean not in clean_values:
+                clean_values.append(clean)
     else:
         clean_values = []
         for value in values:
@@ -67,6 +73,7 @@ def _serialize(row: TriggerMilestone, db: Session) -> dict:
     )
     epic_keys = [link.ref_id for link in links if link.link_type == "epic"]
     task_ids = [link.ref_id for link in links if link.link_type == "task"]
+    scrum_ids = [link.ref_id for link in links if link.link_type == "scrum"]
 
     epics_by_key = {}
     if epic_keys:
@@ -83,6 +90,13 @@ def _serialize(row: TriggerMilestone, db: Session) -> dict:
         )
         for task in tasks:
             tasks_by_id.setdefault(task.graph_task_id, task)
+
+    scrums_by_id = {}
+    if scrum_ids:
+        numeric_scrum_ids = [int(scrum_id) for scrum_id in scrum_ids if scrum_id.isdigit()]
+        if numeric_scrum_ids:
+            scrums = db.query(TriggerScrum).filter(TriggerScrum.id.in_(numeric_scrum_ids)).all()
+            scrums_by_id = {str(scrum.id): scrum for scrum in scrums}
 
     epic_items = [
         {
@@ -103,6 +117,17 @@ def _serialize(row: TriggerMilestone, db: Session) -> dict:
         }
         for task_id in task_ids
     ]
+    scrum_items = [
+        {
+            "id": int(scrum_id),
+            "name": scrums_by_id[scrum_id].name if scrum_id in scrums_by_id else f"Scrum {scrum_id}",
+            "status": scrums_by_id[scrum_id].status if scrum_id in scrums_by_id else None,
+            "start_date": scrums_by_id[scrum_id].start_date if scrum_id in scrums_by_id else None,
+            "end_date": scrums_by_id[scrum_id].end_date if scrum_id in scrums_by_id else None,
+        }
+        for scrum_id in scrum_ids
+        if scrum_id.isdigit()
+    ]
 
     return {
         "id": row.id,
@@ -113,12 +138,15 @@ def _serialize(row: TriggerMilestone, db: Session) -> dict:
         "updated_at": row.updated_at,
         "epic_keys": epic_keys,
         "task_ids": task_ids,
+        "scrum_ids": scrum_ids,
         "summary": {
             "epics": len(epic_keys),
             "tasks": len(task_ids),
+            "scrums": len(scrum_ids),
         },
         "epics": epic_items,
         "tasks": task_items,
+        "scrums": scrum_items,
     }
 
 
@@ -146,6 +174,7 @@ def create_milestone(payload: TriggerMilestoneCreate, request: Request, db: Sess
     db.flush()
     _replace_links(db, row.id, "epic", payload.epic_keys)
     _replace_links(db, row.id, "task", payload.task_ids)
+    _replace_links(db, row.id, "scrum", payload.scrum_ids)
     db.commit()
     db.refresh(row)
     return _serialize(row, db)
@@ -179,6 +208,8 @@ def update_milestone(
         _replace_links(db, row.id, "epic", data.get("epic_keys") or [])
     if "task_ids" in data:
         _replace_links(db, row.id, "task", data.get("task_ids") or [])
+    if "scrum_ids" in data:
+        _replace_links(db, row.id, "scrum", data.get("scrum_ids") or [])
 
     db.commit()
     db.refresh(row)

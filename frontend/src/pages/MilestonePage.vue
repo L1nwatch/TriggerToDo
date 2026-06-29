@@ -6,6 +6,7 @@ import {
   deleteMilestone,
   listEpics,
   listMilestones,
+  listScrums,
   queryCachedTasks,
   updateMilestone,
 } from '../lib/api'
@@ -19,6 +20,7 @@ interface MilestoneForm {
   notes: string
   epic_keys: string[]
   task_ids: string[]
+  scrum_ids: string[]
 }
 
 const loading = ref(false)
@@ -29,6 +31,7 @@ const milestones = ref<TriggerMilestone[]>([])
 const selected = ref<TriggerMilestone | null>(null)
 const epicOptions = ref<Array<{ value: string; label: string }>>([])
 const taskOptions = ref<Array<{ value: string; label: string }>>([])
+const scrumOptions = ref<Array<{ value: string; label: string }>>([])
 
 const form = reactive<MilestoneForm>({
   id: null,
@@ -38,14 +41,17 @@ const form = reactive<MilestoneForm>({
   notes: '',
   epic_keys: [],
   task_ids: [],
+  scrum_ids: [],
 })
 
 const totals = computed(() => {
   const epicKeys = new Set<string>()
   const taskIds = new Set<string>()
+  const scrumIds = new Set<string>()
   for (const milestone of milestones.value) {
     for (const key of milestone.epic_keys || []) epicKeys.add(key)
     for (const taskId of milestone.task_ids || []) taskIds.add(taskId)
+    for (const scrumId of milestone.scrum_ids || []) scrumIds.add(scrumId)
   }
   const next = milestones.value
     .map((item) => ({ item, time: item.milestone_at ? new Date(item.milestone_at).getTime() : Number.NaN }))
@@ -55,6 +61,7 @@ const totals = computed(() => {
     milestones: milestones.value.length,
     epics: epicKeys.size,
     tasks: taskIds.size,
+    scrums: scrumIds.size,
     next: next?.title || 'None',
   }
 })
@@ -72,6 +79,7 @@ function resetForm() {
   form.notes = ''
   form.epic_keys = []
   form.task_ids = []
+  form.scrum_ids = []
 }
 
 function openCreate() {
@@ -87,6 +95,7 @@ function openEdit(milestone: TriggerMilestone) {
   form.notes = milestone.notes || ''
   form.epic_keys = [...(milestone.epic_keys || [])]
   form.task_ids = [...(milestone.task_ids || [])]
+  form.scrum_ids = [...(milestone.scrum_ids || [])]
   dialogVisible.value = true
 }
 
@@ -111,10 +120,11 @@ function formatDate(value?: string | null) {
 async function loadData() {
   loading.value = true
   try {
-    const [milestonesData, epicsData, tasksData] = await Promise.all([
+    const [milestonesData, epicsData, tasksData, scrumsData] = await Promise.all([
       listMilestones(),
       listEpics(),
       queryCachedTasks(),
+      listScrums(),
     ])
     milestones.value = milestonesData.items
     epicOptions.value = epicsData.items
@@ -128,6 +138,11 @@ async function loadData() {
       .map((task) => ({
         value: task.taskId,
         label: task.title || task.taskId,
+      }))
+    scrumOptions.value = scrumsData.items
+      .map((scrum) => ({
+        value: String(scrum.id),
+        label: `${scrum.name} (${scrum.status})`,
       }))
   } catch (error) {
     ElMessage.error((error as Error).message || 'Failed to load milestones')
@@ -151,6 +166,7 @@ async function saveMilestone() {
       notes: form.notes.trim() || null,
       epic_keys: form.epic_keys,
       task_ids: form.task_ids,
+      scrum_ids: form.scrum_ids,
     }
     if (form.id) {
       await updateMilestone(form.id, payload)
@@ -189,9 +205,12 @@ onMounted(loadData)
     <header class="page-head milestone-head">
       <div>
         <h1>Milestones</h1>
-        <p>Timeline of important checkpoints with linked epics and tasks</p>
+        <p>Timeline of important checkpoints with linked epics, scrums, and tasks</p>
       </div>
       <div class="actions">
+        <router-link to="/epics/scrum">
+          <el-button plain>Scrum Target</el-button>
+        </router-link>
         <el-button type="primary" @click="openCreate">Create Milestone</el-button>
       </div>
     </header>
@@ -208,6 +227,10 @@ onMounted(loadData)
       <div class="milestone-kpi milestone-kpi-tasks">
         <span class="metric-label">Linked Tasks</span>
         <strong class="metric-value">{{ totals.tasks }}</strong>
+      </div>
+      <div class="milestone-kpi milestone-kpi-scrums">
+        <span class="metric-label">Linked Scrums</span>
+        <strong class="metric-value">{{ totals.scrums }}</strong>
       </div>
       <div class="milestone-kpi milestone-kpi-next">
         <span class="metric-label">Next</span>
@@ -283,6 +306,11 @@ onMounted(loadData)
             <el-option v-for="option in taskOptions" :key="option.value" :label="option.label" :value="option.value" />
           </el-select>
         </el-form-item>
+        <el-form-item label="Scrums">
+          <el-select v-model="form.scrum_ids" multiple filterable class="field-full" placeholder="Link scrums">
+            <el-option v-for="option in scrumOptions" :key="option.value" :label="option.label" :value="option.value" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="Notes">
           <el-input v-model="form.notes" type="textarea" :rows="3" />
         </el-form-item>
@@ -310,6 +338,23 @@ onMounted(loadData)
             <el-tag v-if="epic.priority" size="small" effect="plain">{{ epic.priority }}</el-tag>
           </div>
           <el-empty v-if="!selected.epics.length" description="No linked epics" />
+        </div>
+
+        <h3>Scrums</h3>
+        <div class="milestone-link-list">
+          <router-link
+            v-for="scrum in selected.scrums"
+            :key="scrum.id"
+            class="milestone-link-item milestone-task-link"
+            to="/epics/scrum"
+          >
+            <strong>{{ scrum.name }}</strong>
+            <span>{{ scrum.status || 'draft' }}</span>
+            <el-tag v-if="scrum.start_date || scrum.end_date" size="small" effect="plain">
+              {{ scrum.start_date || '-' }} - {{ scrum.end_date || '-' }}
+            </el-tag>
+          </router-link>
+          <el-empty v-if="!selected.scrums.length" description="No linked scrums" />
         </div>
 
         <h3>Tasks</h3>

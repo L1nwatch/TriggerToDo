@@ -92,6 +92,14 @@ export interface TriggerMilestoneTask {
   due_datetime?: string | null
 }
 
+export interface TriggerMilestoneScrum {
+  id: number
+  name: string
+  status?: string | null
+  start_date?: string | null
+  end_date?: string | null
+}
+
 export interface TriggerMilestone {
   id: number
   title: string
@@ -101,12 +109,15 @@ export interface TriggerMilestone {
   updated_at: string
   epic_keys: string[]
   task_ids: string[]
+  scrum_ids: string[]
   summary: {
     epics: number
     tasks: number
+    scrums: number
   }
   epics: TriggerMilestoneEpic[]
   tasks: TriggerMilestoneTask[]
+  scrums: TriggerMilestoneScrum[]
 }
 
 export interface TriggerScrumTask {

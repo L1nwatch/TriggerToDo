@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import TaskEditDialog from '../components/TaskEditDialog.vue'
 import TaskForm from '../components/TaskForm.vue'
 import {
   completeScrum,
+  createTask,
   createScrum,
   fetchAllTasks,
   getActiveScrum,
@@ -14,7 +16,7 @@ import {
   updateScrumItemStatus,
   updateTask,
 } from '../lib/api'
-import { builtInTriggerOptions } from '../lib/triggerCatalog'
+import { builtInTriggerOptions, isDateTriggerRef } from '../lib/triggerCatalog'
 import { hasAnyTriggerConfigured, isTaskTriggered, triggerDisplay } from '../lib/triggerSignal'
 import { defaultTaskForm, formFromTask, taskPayloadFromForm, type TaskFormModel } from '../lib/taskForm'
 import type { TodoList, TodoTask, TriggerEvent, TriggerScrum, TriggerScrumItem } from '../lib/types'
@@ -44,6 +46,9 @@ const selectedTaskKeys = ref<string[]>([])
 const pointOverrides = ref<Record<string, number>>({})
 const epicOptions = ref<Array<{ value: string; label: string }>>([])
 const epicPriorityByKey = ref(new Map<string, PriorityTag>())
+const createTaskDialogVisible = ref(false)
+const createTaskSaving = ref(false)
+const createForm = reactive<TaskFormModel>(defaultTaskForm(''))
 const manageTasksVisible = ref(false)
 const editDialogVisible = ref(false)
 const editingItem = ref<TriggerScrumItem | null>(null)
@@ -359,6 +364,41 @@ function selectAllTriggered() {
 
 function clearSelected() {
   selectedTaskKeys.value = []
+}
+
+function openCreateTask() {
+  Object.assign(createForm, defaultTaskForm(lists.value[0]?.id || ''))
+  createForm.wfStatus = 'todo'
+  createTaskDialogVisible.value = true
+}
+
+async function submitCreateTask() {
+  const resolvedListId = createForm.listId || lists.value[0]?.id || ''
+  if (!createForm.title.trim()) {
+    ElMessage.warning('Title is required')
+    return
+  }
+  if (!resolvedListId) {
+    ElMessage.warning('No task list found. Create a list first.')
+    return
+  }
+  if (isDateTriggerRef(createForm.triggerRef) && !createForm.dueAt) {
+    ElMessage.warning('Date trigger requires due date')
+    return
+  }
+
+  createTaskSaving.value = true
+  try {
+    createForm.listId = resolvedListId
+    await createTask(resolvedListId, taskPayloadFromForm(createForm, { includeSource: true }) as never)
+    createTaskDialogVisible.value = false
+    await loadScrum()
+    ElMessage.success('Task created')
+  } catch (error) {
+    ElMessage.error((error as Error).message || 'Failed to create task')
+  } finally {
+    createTaskSaving.value = false
+  }
 }
 
 function applyScrumToDraft(scrum: TriggerScrum) {
@@ -757,6 +797,7 @@ onBeforeUnmount(clearCardClickTimer)
               </el-form-item>
               <el-form-item label="Tasks">
                 <div class="scrum-button-row">
+                  <el-button plain @click="openCreateTask">Create Task</el-button>
                   <el-button @click="selectAllTriggered">Select Triggered</el-button>
                   <el-button @click="clearSelected">Clear</el-button>
                   <el-button type="primary" :loading="saving" @click="createOrUpdateScrum">Start Scrum</el-button>
@@ -915,6 +956,7 @@ onBeforeUnmount(clearCardClickTimer)
         <span>{{ selectedTasks.length }} selected</span>
       </div>
       <div class="scrum-button-row">
+        <el-button plain @click="openCreateTask">Create Task</el-button>
         <el-button @click="selectAllTriggered">Select Triggered</el-button>
         <el-button @click="clearSelected">Clear</el-button>
         <el-button type="primary" :loading="saving" :disabled="!selectedTasks.length" @click="addSelectedToActiveScrum">
@@ -973,6 +1015,19 @@ onBeforeUnmount(clearCardClickTimer)
         <el-button @click="manageTasksVisible = false">Close</el-button>
       </template>
     </el-dialog>
+
+    <TaskEditDialog
+      v-model="createTaskDialogVisible"
+      :model="createForm"
+      :lists="lists"
+      :saving="createTaskSaving"
+      :readonly-list="false"
+      :trigger-options="triggerOptions"
+      :epic-options="epicOptions"
+      title="Create Task"
+      save-text="Create"
+      @save="submitCreateTask"
+    />
 
     <el-dialog v-model="editDialogVisible" title="Edit Scrum Task" width="min(620px, 94vw)" class="scrum-task-dialog">
       <el-form label-position="top" class="scrum-inline-edit" @submit.prevent>

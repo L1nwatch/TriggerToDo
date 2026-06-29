@@ -96,6 +96,7 @@ class TriggerMilestoneCreate(BaseModel):
     notes: Optional[str] = None
     epic_keys: list[str] = Field(default_factory=list)
     task_ids: list[str] = Field(default_factory=list)
+    scrum_ids: list[str] = Field(default_factory=list)
 
 
 class TriggerMilestoneUpdate(BaseModel):
@@ -105,6 +106,7 @@ class TriggerMilestoneUpdate(BaseModel):
     notes: Optional[str] = None
     epic_keys: Optional[list[str]] = None
     task_ids: Optional[list[str]] = None
+    scrum_ids: Optional[list[str]] = None
 
 
 class TriggerScrumItemCreate(BaseModel):
