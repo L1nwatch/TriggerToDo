@@ -5,6 +5,8 @@ import { completeTask, fetchAllTasks, listRoutineChecks, listTriggerEvents, setR
 import { triggerDisplay } from '../lib/triggerSignal'
 import type { TodoTask, TriggerEvent } from '../lib/types'
 
+const ROUTINE_PERIOD_RADIUS_DAYS = 3
+
 function toLocalDateInputValue(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -24,6 +26,12 @@ function addDays(date: Date, days: number) {
   const copy = new Date(date)
   copy.setDate(copy.getDate() + days)
   return copy
+}
+
+function rollingPeriodStart(date: Date) {
+  const copy = new Date(date)
+  copy.setHours(0, 0, 0, 0)
+  return addDays(copy, -ROUTINE_PERIOD_RADIUS_DAYS)
 }
 
 function dateFromLocalInput(value: string) {
@@ -132,7 +140,7 @@ function completionDateKey(task: TodoTask) {
 
 function isDueInVisibleWeek(task: TodoTask) {
   const dueDate = dueDateKey(task)
-  return Boolean(dueDate && dueDate >= routineWeekStart.value && dueDate <= routineWeekEnd.value)
+  return Boolean(dueDate && dueDate >= routineCalendarWeekStart.value && dueDate <= routineCalendarWeekEnd.value)
 }
 
 function shouldCompleteTaskFromCell(task: TodoTask, checkDate: string) {
@@ -155,21 +163,29 @@ const checkingRoutineCell = ref<string | null>(null)
 const tasks = ref<TodoTask[]>([])
 const triggerEvents = ref<TriggerEvent[]>([])
 const routineChecks = ref(new Set<string>())
-const routineWeekStart = ref(toLocalDateInputValue(startOfWeek(new Date())))
+const routineWeekStart = ref(toLocalDateInputValue(rollingPeriodStart(new Date())))
 
 const routineWeekDays = computed(() => {
   const start = dateFromLocalInput(routineWeekStart.value)
+  const today = toLocalDateInputValue(new Date())
   return Array.from({ length: 7 }, (_, index) => {
     const date = addDays(start, index)
+    const dateKey = toLocalDateInputValue(date)
     return {
       index,
-      date: toLocalDateInputValue(date),
+      date: dateKey,
       label: date.toLocaleDateString(undefined, { weekday: 'long' }),
-      shortDate: toLocalDateInputValue(date),
+      shortDate: dateKey,
+      isToday: dateKey === today,
     }
   })
 })
 const routineWeekEnd = computed(() => routineWeekDays.value[6]?.date || routineWeekStart.value)
+const routinePeriodCenter = computed(() => toLocalDateInputValue(addDays(dateFromLocalInput(routineWeekStart.value), ROUTINE_PERIOD_RADIUS_DAYS)))
+const routineCalendarWeekStart = computed(() => toLocalDateInputValue(startOfWeek(dateFromLocalInput(routinePeriodCenter.value))))
+const routineCalendarWeekEnd = computed(() => toLocalDateInputValue(addDays(dateFromLocalInput(routineCalendarWeekStart.value), 6)))
+const routineCheckStart = computed(() => routineWeekStart.value < routineCalendarWeekStart.value ? routineWeekStart.value : routineCalendarWeekStart.value)
+const routineCheckEnd = computed(() => routineWeekEnd.value > routineCalendarWeekStart.value ? routineWeekEnd.value : routineCalendarWeekStart.value)
 const routineWeekLabel = computed(() => `${formatDate(routineWeekStart.value)} - ${formatDate(routineWeekEnd.value)}`)
 
 const routineTasks = computed(() =>
@@ -193,8 +209,8 @@ const completedRoutineChecks = computed(() => {
     const frequency = routineFrequency(task)
     if (frequency === 'Daily') {
       checks.add(completedRoutineKey(routineIdentity(task), completedDate))
-    } else if (completedDate >= routineWeekStart.value && completedDate <= routineWeekEnd.value) {
-      checks.add(completedRoutineKey(routineIdentity(task), routineWeekStart.value))
+    } else if (completedDate >= routineCalendarWeekStart.value && completedDate <= routineCalendarWeekEnd.value) {
+      checks.add(completedRoutineKey(routineIdentity(task), routineCalendarWeekStart.value))
     }
   }
   return checks
@@ -212,8 +228,8 @@ const nextInstanceRoutineChecks = computed(() => {
       }
     } else if (frequency === 'Weekly') {
       const previousDate = toLocalDateInputValue(addDays(dateFromLocalInput(dueDate), -7))
-      if (previousDate >= routineWeekStart.value && previousDate <= routineWeekEnd.value) {
-        checks.add(completedRoutineKey(routineIdentity(task), routineWeekStart.value))
+      if (previousDate >= routineCalendarWeekStart.value && previousDate <= routineCalendarWeekEnd.value) {
+        checks.add(completedRoutineKey(routineIdentity(task), routineCalendarWeekStart.value))
       }
     }
   }
@@ -226,7 +242,7 @@ const checkedRoutineCount = computed(() => {
   let count = 0
   for (const task of routineTasks.value) {
     if (routineFrequency(task) === 'Weekly') {
-      if (isRoutineChecked(task, routineWeekStart.value)) count += 1
+      if (isRoutineChecked(task, routineCalendarWeekStart.value)) count += 1
     } else {
       for (const day of routineWeekDays.value) {
         if (isRoutineChecked(task, day.date)) count += 1
@@ -247,7 +263,7 @@ function isRoutineCompletedFromTriggerSet(task: TodoTask, checkDate: string) {
 }
 
 function routineCheckDateForCell(task: TodoTask, day: { date: string }) {
-  return routineFrequency(task) === 'Weekly' ? routineWeekStart.value : day.date
+  return routineFrequency(task) === 'Weekly' ? routineCalendarWeekStart.value : day.date
 }
 
 async function setRoutineChecked(task: TodoTask, checkDate: string, checked: boolean) {
@@ -279,7 +295,7 @@ async function setRoutineChecked(task: TodoTask, checkDate: string, checked: boo
 }
 
 async function loadRoutineChecks() {
-  const data = await listRoutineChecks(routineWeekStart.value, routineWeekEnd.value)
+  const data = await listRoutineChecks(routineCheckStart.value, routineCheckEnd.value)
   routineChecks.value = new Set(data.items.map((item) => routineCheckKey(item.list_id, item.task_id, item.check_date)))
 }
 
@@ -293,7 +309,7 @@ async function shiftRoutineWeek(days: number) {
 }
 
 async function resetRoutineWeek() {
-  routineWeekStart.value = toLocalDateInputValue(startOfWeek(new Date()))
+  routineWeekStart.value = toLocalDateInputValue(rollingPeriodStart(new Date()))
   try {
     await loadRoutineChecks()
   } catch (error) {
@@ -307,7 +323,7 @@ async function loadRoutineTracker() {
     const [taskData, eventsData, routineData] = await Promise.all([
       fetchAllTasks(),
       listTriggerEvents(),
-      listRoutineChecks(routineWeekStart.value, routineWeekEnd.value),
+      listRoutineChecks(routineCheckStart.value, routineCheckEnd.value),
     ])
     tasks.value = taskData.tasks
     triggerEvents.value = eventsData.items
@@ -339,7 +355,7 @@ onMounted(loadRoutineTracker)
         </div>
         <div class="routine-metrics">
           <el-button size="small" plain @click="shiftRoutineWeek(-7)">Previous</el-button>
-          <el-button size="small" plain @click="resetRoutineWeek">This Week</el-button>
+          <el-button size="small" plain @click="resetRoutineWeek">Today</el-button>
           <el-button size="small" plain @click="shiftRoutineWeek(7)">Next</el-button>
           <el-tag type="warning" effect="plain">{{ dueRoutineCount }} due</el-tag>
           <el-tag type="success" effect="plain">{{ dailyRoutineCount }} daily</el-tag>
@@ -374,7 +390,7 @@ onMounted(loadRoutineTracker)
         >
           <template #header>
             <div class="routine-day-head">
-              <strong>{{ day.label }}</strong>
+              <strong>{{ day.isToday ? 'Today' : day.label }}</strong>
               <span>{{ day.shortDate }}</span>
             </div>
           </template>
