@@ -585,7 +585,8 @@ body {
   flex-wrap: wrap;
 }
 
-.epic-table-header span {
+.epic-table-header > span,
+.epic-table-header .scrum-button-row > span {
   color: var(--muted);
   font-size: 13px;
 }
@@ -749,6 +750,7 @@ body {
 
 .scrum-button-row {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }

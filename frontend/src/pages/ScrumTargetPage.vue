@@ -798,9 +798,6 @@ onBeforeUnmount(clearCardClickTimer)
               </el-form-item>
               <el-form-item label="Tasks">
                 <div class="scrum-button-row">
-                  <el-button plain @click="openCreateTask">Create Task</el-button>
-                  <el-button @click="selectAllTriggered">Select Triggered</el-button>
-                  <el-button @click="clearSelected">Clear</el-button>
                   <el-button type="primary" :loading="saving" @click="createOrUpdateScrum">Start Scrum</el-button>
                 </div>
               </el-form-item>
@@ -903,7 +900,10 @@ onBeforeUnmount(clearCardClickTimer)
         <template #header>
           <div class="epic-table-header">
             <strong>Triggered task backlog</strong>
-            <span>{{ selectedTasks.length }} selected</span>
+            <div class="scrum-button-row">
+              <span>{{ selectedTasks.length }} selected</span>
+              <el-button plain @click="openCreateTask">Create Task</el-button>
+            </div>
           </div>
         </template>
         <el-table :data="candidateTasks" row-key="id" empty-text="No unplanned triggered tasks found" class="epic-table scrum-table">
