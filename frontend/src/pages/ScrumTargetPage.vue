@@ -390,6 +390,7 @@ async function submitCreateTask() {
   createTaskSaving.value = true
   try {
     createForm.listId = resolvedListId
+    createForm.wfStatus = 'todo'
     await createTask(resolvedListId, taskPayloadFromForm(createForm, { includeSource: true }) as never)
     createTaskDialogVisible.value = false
     await loadScrum()
@@ -1022,6 +1023,7 @@ onBeforeUnmount(clearCardClickTimer)
       :lists="lists"
       :saving="createTaskSaving"
       :readonly-list="false"
+      :hide-workflow-status="true"
       :trigger-options="triggerOptions"
       :epic-options="epicOptions"
       title="Create Task"
