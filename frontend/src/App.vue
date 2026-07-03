@@ -3,9 +3,11 @@ import { computed, onMounted, reactive, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { fetchAllTasks, listEpics, listMilestones } from './lib/api'
 import { isOnOrAfterBoardCutoff } from './lib/boardCutoff'
+import { useTheme } from './lib/theme'
 import { hasAnyTriggerConfigured } from './lib/triggerSignal'
 
 const route = useRoute()
+const { isDark } = useTheme()
 const sidebarCounts = reactive({
   epics: 0,
   milestones: 0,
@@ -99,6 +101,10 @@ watch(
         <el-menu-item index="/triggers">Triggers</el-menu-item>
         <el-menu-item index="/events">Events</el-menu-item>
       </el-menu>
+      <div class="theme-toggle">
+        <span>Dark Mode</span>
+        <el-switch v-model="isDark" aria-label="Toggle dark mode" />
+      </div>
     </aside>
 
     <main class="content">
