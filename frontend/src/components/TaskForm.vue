@@ -75,7 +75,13 @@ const sortedEpicOptions = computed(() => {
 })
 
 const eventTriggerOptions = computed(() => {
-  const fromProps = (props.triggerOptions || []).filter((option) => String(option.value || '').startsWith('event:'))
+  const currentTriggerRef = String(props.model.triggerRef || '')
+  const fromProps = (props.triggerOptions || []).filter((option) => {
+    const value = String(option.value || '')
+    if (!value.startsWith('event:')) return false
+    if (value === currentTriggerRef) return true
+    return !String(option.label || '').toLowerCase().includes('(occurred)')
+  })
   const merged = [...fromProps, ...createdEventOptions.value]
   const deduped = new Map<string, { value: string; label: string; disabled?: boolean }>()
   for (const option of merged) deduped.set(option.value, option)
