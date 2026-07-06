@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createTriggerEvent, deleteTriggerEvent, listTriggerEvents, updateTriggerEvent } from '../lib/api'
 import type { TriggerEvent } from '../lib/types'
@@ -11,6 +11,12 @@ const events = ref<TriggerEvent[]>([])
 const form = reactive({ name: '' })
 const editingEventId = ref<number | null>(null)
 const editingName = ref('')
+const sortedEvents = computed(() =>
+  [...events.value].sort((a, b) => {
+    if (a.is_active !== b.is_active) return a.is_active ? 1 : -1
+    return b.id - a.id
+  }),
+)
 
 async function loadEvents() {
   loading.value = true
@@ -122,7 +128,7 @@ onMounted(loadEvents)
       <template #header>
         <strong>Events</strong>
       </template>
-      <el-table :data="events" empty-text="No events yet">
+      <el-table :data="sortedEvents" empty-text="No events yet">
         <el-table-column label="Name" min-width="260">
           <template #default="scope">
             <el-input
