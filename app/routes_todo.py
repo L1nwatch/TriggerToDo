@@ -250,8 +250,7 @@ def _ensure_default_list(db: Session) -> TodoListCache:
         etag=None,
     )
     db.add(row)
-    db.commit()
-    db.refresh(row)
+    db.flush()
     return row
 
 
@@ -260,6 +259,7 @@ def list_lists(request: Request, db: Session = Depends(get_db)):
     _ = request
     if db.query(TodoListCache.id).first() is None:
         _ensure_default_list(db)
+        db.commit()
     rows = db.query(TodoListCache).order_by(TodoListCache.display_name.asc()).all()
     return [{"id": row.graph_list_id, "displayName": row.display_name} for row in rows]
 
@@ -330,15 +330,19 @@ def list_tasks(list_id: str, request: Request, db: Session = Depends(get_db)):
 @router.post("/lists/{list_id}/tasks")
 def create_task(list_id: str, payload: GraphTaskCreate, request: Request, db: Session = Depends(get_db)):
     _ = request
-    list_row = (
-        db.query(TodoListCache)
-        .filter(TodoListCache.graph_list_id == list_id)
-        .first()
-    )
+    list_row = _find_task_list(db, list_id)
     if not list_row:
-        fallback = _ensure_default_list(db)
-        list_id = fallback.graph_list_id
+        list_row = _ensure_default_list(db)
+    row = _new_task(db, list_row.graph_list_id, payload)
+    db.commit()
+    return _to_task_dict(row)
 
+
+def _find_task_list(db: Session, list_id: str) -> TodoListCache | None:
+    return db.query(TodoListCache).filter(TodoListCache.graph_list_id == list_id).first()
+
+
+def _new_task(db: Session, list_id: str, payload: GraphTaskCreate) -> TodoTaskCache:
     task_id = f"local-task-{uuid4().hex}"
 
     body = payload.body or {}
@@ -379,8 +383,7 @@ def create_task(list_id: str, payload: GraphTaskCreate, request: Request, db: Se
     )
     _upsert_raw_json_from_row(row)
     db.add(row)
-    db.commit()
-    return _to_task_dict(row)
+    return row
 
 
 @router.patch("/lists/{list_id}/tasks/{task_id}")
@@ -398,6 +401,12 @@ def update_task(list_id: str, task_id: str, payload: GraphTaskUpdate, request: R
     if not row:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    _apply_task_update(db, row, payload)
+    db.commit()
+    return _to_task_dict(row)
+
+
+def _apply_task_update(db: Session, row: TodoTaskCache, payload: GraphTaskUpdate) -> None:
     body = payload.model_dump(exclude_unset=True)
     ext_fields = body.pop("extensions", None)
 
@@ -446,8 +455,6 @@ def update_task(list_id: str, task_id: str, payload: GraphTaskUpdate, request: R
             row.raw_json = json.dumps(raw)
 
     _upsert_raw_json_from_row(row)
-    db.commit()
-    return _to_task_dict(row)
 
 
 @router.patch("/tasks/{task_id}")
